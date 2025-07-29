@@ -45,8 +45,9 @@ export interface FamilyTreeData {
 export interface ProcessedPerson extends PersonData {
   x: number
   y: number
+  generation: number  // nullを許可しない（処理時に必ずnumberが設定される）
   displayName: string
-  isUncertain?: boolean
+  isUncertain: boolean  // 処理時に必ずbooleanが設定される
 }
 
 // 家族グループの型

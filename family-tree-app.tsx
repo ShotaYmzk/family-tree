@@ -25,8 +25,9 @@ import { FamilyTree } from "./components/FamilyTree"
 import { PersonEditDialog } from "./components/PersonEditDialog"
 import { RelationshipEditDialog } from "./components/RelationshipEditDialog"
 import { AddPersonDialog } from "./components/AddPersonDialog"
+import { KosekiUploadDialog } from "./components/KosekiUploadDialog"
 import { useFamilyData } from "./hooks/useFamilyData"
-import { ProcessedPerson, searchPersons } from "./utils/familyDataProcessor"
+import { ProcessedPerson, searchPersons, FamilyTreeData, processFamilyData } from "./utils/familyDataProcessor"
 import { UI_CONFIG } from "./constants/config"
 
 interface Project {
@@ -72,6 +73,7 @@ export default function FamilyTreeApp() {
   const [isPersonEditOpen, setIsPersonEditOpen] = useState(false)
   const [isRelationshipEditOpen, setIsRelationshipEditOpen] = useState(false)
   const [isAddPersonOpen, setIsAddPersonOpen] = useState(false)
+  const [isKosekiUploadOpen, setIsKosekiUploadOpen] = useState(false)
 
   // キーボードショートカット
   useEffect(() => {
@@ -106,6 +108,27 @@ export default function FamilyTreeApp() {
   // 人物位置更新ハンドラー
   const handlePersonPositionUpdate = (id: string, x: number, y: number) => {
     updatePerson(id, { x, y })
+  }
+
+  // 戸籍データ抽出ハンドラー
+  const handleKosekiDataExtracted = (data: FamilyTreeData) => {
+    // 新しいデータをアプリの状態に適用
+    const processed = processFamilyData(data)
+    
+    // 既存のデータをクリアして新しいデータを設定
+    // 注意: これは既存のデータを完全に置き換えます
+    processed.persons.forEach(person => addPerson(person))
+    processed.families.forEach(family => {
+      addFamily({
+        parentIds: family.parents.map(p => p.id),
+        childrenIds: family.children.map(c => c.id),
+        marriageDate: family.marriageDate,
+        divorceDate: family.divorceDate,
+        relationType: family.relationType
+      })
+    })
+    
+    setIsKosekiUploadOpen(false)
   }
 
   // 検索結果
@@ -222,13 +245,16 @@ export default function FamilyTreeApp() {
         {/* 左サイドバー */}
         <aside style={{ width: leftSidebarWidth }} className="bg-white border-r border-gray-200 flex flex-col">
           <div className="p-6 border-b border-gray-200">
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer">
+            <div 
+              className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer"
+              onClick={() => setIsKosekiUploadOpen(true)}
+            >
               <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
               <p className="text-lg font-medium text-gray-900 mb-2">戸籍PDFをアップロード</p>
               <p className="text-sm text-gray-500">
-                ファイルをドラッグ＆ドロップ
+                戸籍謄本PDFをAIで解析
                 <br />
-                またはクリックして選択
+                クリックして開始
               </p>
             </div>
           </div>
@@ -478,6 +504,12 @@ export default function FamilyTreeApp() {
         onAdd={(personData) => {
           addPerson(personData)
         }}
+      />
+
+      <KosekiUploadDialog
+        isOpen={isKosekiUploadOpen}
+        onClose={() => setIsKosekiUploadOpen(false)}
+        onDataExtracted={handleKosekiDataExtracted}
       />
     </div>
   )
