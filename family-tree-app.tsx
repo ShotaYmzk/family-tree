@@ -79,6 +79,11 @@ interface ProcessedPerson extends FamilyMember {
   isUncertain?: boolean
 }
 
+interface AvailablePerson {
+  id: string
+  name: string
+}
+
 interface Person {
   id: string
   name: string
@@ -528,7 +533,7 @@ export default function FamilyTreeApp() {
     setFamilyData((prev: any) => ({ ...prev }))
   }
 
-  const availablePersons = familyData.family_members.map((person: any) => ({
+  const availablePersons: AvailablePerson[] = familyData.family_members.map((person: any) => ({
     id: person.id,
     name: `${person.name.surname} ${person.name.given_name}`,
   }))
@@ -962,7 +967,7 @@ export default function FamilyTreeApp() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">なし</SelectItem>
-                          {availablePersons.map(person => (
+                          {availablePersons.map((person: AvailablePerson) => (
                             <SelectItem key={person.id} value={person.id}>{person.name}</SelectItem>
                           ))}
                         </SelectContent>
@@ -976,7 +981,7 @@ export default function FamilyTreeApp() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">なし</SelectItem>
-                          {availablePersons.map(person => (
+                          {availablePersons.map((person: AvailablePerson) => (
                             <SelectItem key={person.id} value={person.id}>{person.name}</SelectItem>
                           ))}
                         </SelectContent>
@@ -990,7 +995,7 @@ export default function FamilyTreeApp() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">なし</SelectItem>
-                          {availablePersons.map(person => (
+                          {availablePersons.map((person: AvailablePerson) => (
                             <SelectItem key={person.id} value={person.id}>{person.name}</SelectItem>
                           ))}
                         </SelectContent>
@@ -1004,7 +1009,7 @@ export default function FamilyTreeApp() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">なし</SelectItem>
-                          {availablePersons.map(person => (
+                          {availablePersons.map((person: AvailablePerson) => (
                             <SelectItem key={person.id} value={person.id}>{person.name}</SelectItem>
                           ))}
                         </SelectContent>
@@ -1043,7 +1048,7 @@ export default function FamilyTreeApp() {
                           <SelectValue placeholder="人物を選択" />
                         </SelectTrigger>
                         <SelectContent>
-                          {availablePersons.map(person => (
+                          {availablePersons.map((person: AvailablePerson) => (
                             <SelectItem key={person.id} value={person.id}>{person.name}</SelectItem>
                           ))}
                         </SelectContent>
@@ -1070,7 +1075,7 @@ export default function FamilyTreeApp() {
                           <SelectValue placeholder="人物を選択" />
                         </SelectTrigger>
                         <SelectContent>
-                          {availablePersons.filter(p => p.id !== relationshipForm.person1).map(person => (
+                          {availablePersons.filter((p: AvailablePerson) => p.id !== relationshipForm.person1).map((person: AvailablePerson) => (
                             <SelectItem key={person.id} value={person.id}>{person.name}</SelectItem>
                           ))}
                         </SelectContent>
@@ -1195,28 +1200,28 @@ export default function FamilyTreeApp() {
                           <div className="flex items-center gap-2 text-sm">
                             <User className="w-4 h-4 text-gray-400" />
                             <span className="text-gray-600">父:</span>
-                            <span>{availablePersons.find(p => p.id === selectedPerson.father)?.name || selectedPerson.father}</span>
+                            <span>{availablePersons.find((p: AvailablePerson) => p.id === selectedPerson.father)?.name || selectedPerson.father}</span>
                           </div>
                         )}
                         {selectedPerson.mother && (
                           <div className="flex items-center gap-2 text-sm">
                             <User className="w-4 h-4 text-gray-400" />
                             <span className="text-gray-600">母:</span>
-                            <span>{availablePersons.find(p => p.id === selectedPerson.mother)?.name || selectedPerson.mother}</span>
+                            <span>{availablePersons.find((p: AvailablePerson) => p.id === selectedPerson.mother)?.name || selectedPerson.mother}</span>
                           </div>
                         )}
                         {selectedPerson.adoptive_father && (
                           <div className="flex items-center gap-2 text-sm">
                             <User className="w-4 h-4 text-gray-400" />
                             <span className="text-gray-600">養父:</span>
-                            <span>{availablePersons.find(p => p.id === selectedPerson.adoptive_father)?.name || selectedPerson.adoptive_father}</span>
+                            <span>{availablePersons.find((p: AvailablePerson) => p.id === selectedPerson.adoptive_father)?.name || selectedPerson.adoptive_father}</span>
                           </div>
                         )}
                         {selectedPerson.adoptive_mother && (
                           <div className="flex items-center gap-2 text-sm">
                             <User className="w-4 h-4 text-gray-400" />
                             <span className="text-gray-600">養母:</span>
-                            <span>{availablePersons.find(p => p.id === selectedPerson.adoptive_mother)?.name || selectedPerson.adoptive_mother}</span>
+                            <span>{availablePersons.find((p: AvailablePerson) => p.id === selectedPerson.adoptive_mother)?.name || selectedPerson.adoptive_mother}</span>
                           </div>
                         )}
                         {selectedPerson.spouses && selectedPerson.spouses.length > 0 && (
