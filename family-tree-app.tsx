@@ -29,6 +29,7 @@ import {
   Clock,
   Eye,
   Edit3,
+  Maximize,
 } from "lucide-react"
 
 interface FamilyMember {
@@ -112,9 +113,18 @@ export default function FamilyTreeApp() {
   const [rightSidebarWidth, setRightSidebarWidth] = useState(320)
   const [isResizing, setIsResizing] = useState<"left" | "right" | null>(null)
 
+  // ズーム・パン機能用のstate
+  const [zoom, setZoom] = useState(1)
+  const [panX, setPanX] = useState(0)
+  const [panY, setPanY] = useState(0)
+  const [isPanning, setIsPanning] = useState(false)
+  const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 })
+  const canvasRef = useRef<HTMLDivElement>(null)
+
   // 編集機能用のstate
   const [isAddPersonDialogOpen, setIsAddPersonDialogOpen] = useState(false)
   const [isAddRelationshipDialogOpen, setIsAddRelationshipDialogOpen] = useState(false)
+  const [isEditNodeDialogOpen, setIsEditNodeDialogOpen] = useState(false)
   const [familyData, setFamilyData] = useState<any>({ family_members: [] })
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
@@ -148,6 +158,25 @@ export default function FamilyTreeApp() {
     relationshipType: "spouse", // spouse, child, parent, sibling
     marriageDate: "",
     divorceDate: "",
+  })
+
+  // ノード編集フォーム用のstate
+  const [editNodeForm, setEditNodeForm] = useState({
+    surname: "",
+    givenName: "",
+    birthDate: "",
+    deathDate: "",
+    birthPlace: "",
+    deathPlace: "",
+    father: "",
+    mother: "",
+    adoptiveFather: "",
+    adoptiveMother: "",
+    spouses: [] as Array<{
+      name: string
+      marriageDate: string
+      divorceDate: string
+    }>,
   })
 
   // Load family data from JSON file
@@ -598,6 +627,101 @@ export default function FamilyTreeApp() {
     return connections
   }, [processedPersons])
 
+  // 兄弟姉妹関係を探す関数
+  const findSiblingConnections = useMemo(() => {
+    const siblingGroups: Array<ProcessedPerson[]> = []
+    
+    // 親のchildrenフィールドから兄妹関係を検出（主要な方法）
+    processedPersons.forEach(person => {
+      if (person.children && person.children.length >= 2) {
+        // この親の子供たちを兄妹として扱う
+        const childrenPersons: ProcessedPerson[] = []
+        
+        person.children.forEach((childInfo: any) => {
+          const child = processedPersons.find(p => 
+            `${p.name.surname} ${p.name.given_name}`.trim() === childInfo.name.trim()
+          )
+          if (child) {
+            childrenPersons.push(child)
+          }
+        })
+        
+        if (childrenPersons.length >= 2) {
+          // 既存のグループと重複しないかチェック
+          const existingGroupIndex = siblingGroups.findIndex(group => 
+            group.some(sibling => childrenPersons.some(child => child.id === sibling.id))
+          )
+          
+          if (existingGroupIndex === -1) {
+            // X座標でソート（左から右へ）して、年齢順にもなるようにする
+            const sortedChildren = childrenPersons.sort((a, b) => {
+              // まずX座標でソート
+              if (a.x !== b.x) return a.x - b.x
+              // X座標が同じ場合は生年月日でソート
+              if (a.birth?.date && b.birth?.date) {
+                return a.birth.date.localeCompare(b.birth.date)
+              }
+              return 0
+            })
+            siblingGroups.push(sortedChildren)
+          } else {
+            // 既存のグループに新しい兄妹を追加（重複排除）
+            const existingGroup = siblingGroups[existingGroupIndex]
+            childrenPersons.forEach(child => {
+              if (!existingGroup.some(sibling => sibling.id === child.id)) {
+                existingGroup.push(child)
+              }
+            })
+            // 再ソート
+            existingGroup.sort((a, b) => {
+              if (a.x !== b.x) return a.x - b.x
+              if (a.birth?.date && b.birth?.date) {
+                return a.birth.date.localeCompare(b.birth.date)
+              }
+              return 0
+            })
+          }
+        }
+      }
+    })
+    
+    // 補完：父母の組み合わせごとにグループ化（追加チェック）
+    const parentCombinations = new Map<string, ProcessedPerson[]>()
+    
+    processedPersons.forEach(person => {
+      // 実の親が両方いる場合のみ兄妹として扱う
+      if (person.father && person.mother) {
+        const key = `${person.father}-${person.mother}`
+        if (!parentCombinations.has(key)) {
+          parentCombinations.set(key, [])
+        }
+        parentCombinations.get(key)!.push(person)
+      }
+    })
+    
+    // 父母による兄妹関係をチェックし、まだ含まれていないものを追加
+    parentCombinations.forEach((siblings) => {
+      if (siblings.length >= 2) {
+        const existingGroupIndex = siblingGroups.findIndex(group => 
+          group.some(sibling => siblings.some(child => child.id === sibling.id))
+        )
+        
+        if (existingGroupIndex === -1) {
+          const sortedSiblings = siblings.sort((a, b) => {
+            if (a.x !== b.x) return a.x - b.x
+            if (a.birth?.date && b.birth?.date) {
+              return a.birth.date.localeCompare(b.birth.date)
+            }
+            return 0
+          })
+          siblingGroups.push(sortedSiblings)
+        }
+      }
+    })
+    
+    return siblingGroups
+  }, [processedPersons])
+
   // リサイズ機能
   const handleMouseDown = useCallback((side: "left" | "right") => {
     setIsResizing(side)
@@ -751,6 +875,96 @@ export default function FamilyTreeApp() {
       }))
       setSelectedPerson(null)
     }
+  }
+
+  // ノード編集ダイアログを開く関数
+  const handleEditNodeOpen = () => {
+    if (!selectedPerson) return
+
+    const currentPerson = familyData.family_members.find((p: any) => p.id === selectedPerson.id)
+    if (!currentPerson) return
+
+    // 現在の人物情報をフォームに設定
+    setEditNodeForm({
+      surname: currentPerson.name.surname || "",
+      givenName: currentPerson.name.given_name || "",
+      birthDate: currentPerson.birth?.date || "",
+      deathDate: currentPerson.death?.date || "",
+      birthPlace: currentPerson.birth?.place || "",
+      deathPlace: currentPerson.death?.place || "",
+      father: currentPerson.father || "none",
+      mother: currentPerson.mother || "none",
+      adoptiveFather: currentPerson.adoptive_father || "none",
+      adoptiveMother: currentPerson.adoptive_mother || "none",
+      spouses: currentPerson.spouses ? currentPerson.spouses.map((spouse: any) => ({
+        name: spouse.name || "",
+        marriageDate: spouse.marriage_date || "",
+        divorceDate: spouse.divorce_date || "",
+      })) : [],
+    })
+
+    setIsEditNodeDialogOpen(true)
+  }
+
+  // ノード編集を保存する関数
+  const handleEditNodeSave = () => {
+    if (!selectedPerson) return
+
+    const updatedFamilyMembers = [...familyData.family_members]
+    const personIndex = updatedFamilyMembers.findIndex((p: any) => p.id === selectedPerson.id)
+    
+    if (personIndex === -1) return
+
+    // 更新されたデータ
+    const updatedPerson = {
+      ...updatedFamilyMembers[personIndex],
+      name: {
+        surname: editNodeForm.surname,
+        given_name: editNodeForm.givenName,
+      },
+      birth: editNodeForm.birthDate ? {
+        date: editNodeForm.birthDate,
+        place: editNodeForm.birthPlace || undefined,
+      } : undefined,
+      death: editNodeForm.deathDate ? {
+        date: editNodeForm.deathDate,
+        place: editNodeForm.deathPlace || undefined,
+      } : undefined,
+      father: editNodeForm.father === "none" ? undefined : editNodeForm.father,
+      mother: editNodeForm.mother === "none" ? undefined : editNodeForm.mother,
+      adoptive_father: editNodeForm.adoptiveFather === "none" ? undefined : editNodeForm.adoptiveFather,
+      adoptive_mother: editNodeForm.adoptiveMother === "none" ? undefined : editNodeForm.adoptiveMother,
+      spouses: editNodeForm.spouses.length > 0 ? editNodeForm.spouses.map(spouse => ({
+        name: spouse.name,
+        marriage_date: spouse.marriageDate || undefined,
+        divorce_date: spouse.divorceDate || undefined,
+      })) : undefined,
+    }
+
+    updatedFamilyMembers[personIndex] = updatedPerson
+
+    setFamilyData({
+      ...familyData,
+      family_members: updatedFamilyMembers
+    })
+
+    setIsEditNodeDialogOpen(false)
+  }
+
+  // 配偶者を追加する関数
+  const handleAddSpouse = () => {
+    setEditNodeForm(prev => ({
+      ...prev,
+      spouses: [...prev.spouses, { name: "", marriageDate: "", divorceDate: "" }]
+    }))
+  }
+
+  // 配偶者を削除する関数
+  const handleRemoveSpouse = (index: number) => {
+    setEditNodeForm(prev => ({
+      ...prev,
+      spouses: prev.spouses.filter((_, i) => i !== index)
+    }))
   }
 
   const handleAutoLayout = () => {
@@ -913,6 +1127,130 @@ export default function FamilyTreeApp() {
     }
   }
 
+  // ズーム機能のハンドラー
+  const handleZoomIn = useCallback(() => {
+    setZoom(prev => Math.min(prev * 1.2, 3))
+  }, [])
+
+  const handleZoomOut = useCallback(() => {
+    setZoom(prev => Math.max(prev / 1.2, 0.1))
+  }, [])
+
+  const handleFitToView = useCallback(() => {
+    if (!canvasRef.current || processedPersons.length === 0) return
+
+    const canvasRect = canvasRef.current.getBoundingClientRect()
+    const padding = 50
+
+    // 全ノードの境界を計算
+    const allX = processedPersons.map(p => p.x)
+    const allY = processedPersons.map(p => p.y)
+    const minX = Math.min(...allX) - 80 // カード幅の半分を考慮
+    const maxX = Math.max(...allX) + 80
+    const minY = Math.min(...allY) - 50 // カード高さの半分を考慮
+    const maxY = Math.max(...allY) + 50
+
+    const contentWidth = maxX - minX
+    const contentHeight = maxY - minY
+
+    // 利用可能な領域
+    const availableWidth = canvasRect.width - padding * 2
+    const availableHeight = canvasRect.height - padding * 2
+
+    // ズーム倍率を計算
+    const scaleX = availableWidth / contentWidth
+    const scaleY = availableHeight / contentHeight
+    const newZoom = Math.min(scaleX, scaleY, 2) // 最大2倍まで
+
+    // 中央寄せのためのパン値を計算
+    const centerX = (minX + maxX) / 2
+    const centerY = (minY + maxY) / 2
+    const viewCenterX = canvasRect.width / 2
+    const viewCenterY = canvasRect.height / 2
+
+    setZoom(newZoom)
+    setPanX(viewCenterX - centerX * newZoom)
+    setPanY(viewCenterY - centerY * newZoom)
+  }, [processedPersons])
+
+  const handleResetView = useCallback(() => {
+    setZoom(1)
+    setPanX(0)
+    setPanY(0)
+  }, [])
+
+  // パン機能のハンドラー
+  const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
+    // 人物ノードをクリックした場合はパンを開始しない
+    if ((e.target as HTMLElement).closest('[data-person-card]')) return
+    
+    setIsPanning(true)
+    setLastPanPoint({ x: e.clientX, y: e.clientY })
+    e.preventDefault()
+  }, [])
+
+  const handleCanvasMouseMove = useCallback((e: MouseEvent) => {
+    if (!isPanning) return
+
+    const deltaX = e.clientX - lastPanPoint.x
+    const deltaY = e.clientY - lastPanPoint.y
+
+    setPanX(prev => prev + deltaX)
+    setPanY(prev => prev + deltaY)
+    setLastPanPoint({ x: e.clientX, y: e.clientY })
+  }, [isPanning, lastPanPoint])
+
+  const handleCanvasMouseUp = useCallback(() => {
+    setIsPanning(false)
+  }, [])
+
+  // マウスホイールでズーム
+  const handleWheel = useCallback((e: WheelEvent) => {
+    if (!canvasRef.current) return
+    
+    e.preventDefault()
+    const rect = canvasRef.current.getBoundingClientRect()
+    const mouseX = e.clientX - rect.left
+    const mouseY = e.clientY - rect.top
+
+    const delta = e.deltaY > 0 ? 0.9 : 1.1
+    const newZoom = Math.max(0.1, Math.min(3, zoom * delta))
+
+    // マウス位置を中心にズーム
+    const zoomPointX = (mouseX - panX) / zoom
+    const zoomPointY = (mouseY - panY) / zoom
+
+    setPanX(mouseX - zoomPointX * newZoom)
+    setPanY(mouseY - zoomPointY * newZoom)
+    setZoom(newZoom)
+  }, [zoom, panX, panY])
+
+  // キャンバスイベントリスナー
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    canvas.addEventListener('wheel', handleWheel, { passive: false })
+    
+    return () => {
+      canvas.removeEventListener('wheel', handleWheel)
+    }
+  }, [handleWheel])
+
+  useEffect(() => {
+    if (isPanning) {
+      document.addEventListener('mousemove', handleCanvasMouseMove)
+      document.addEventListener('mouseup', handleCanvasMouseUp)
+      document.body.style.cursor = 'grabbing'
+      
+      return () => {
+        document.removeEventListener('mousemove', handleCanvasMouseMove)
+        document.removeEventListener('mouseup', handleCanvasMouseUp)
+        document.body.style.cursor = 'default'
+      }
+    }
+  }, [isPanning, handleCanvasMouseMove, handleCanvasMouseUp])
+
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* ヘッダー */}
@@ -1027,47 +1365,111 @@ export default function FamilyTreeApp() {
         <main className="flex-1 relative bg-gray-100">
           {/* ズーム・パンコントロール */}
           <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-            <Button size="sm" variant="outline" className="bg-white">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="bg-white shadow-md hover:shadow-lg"
+              onClick={handleZoomIn}
+              title="ズームイン"
+            >
               <ZoomIn className="w-4 h-4" />
             </Button>
-            <Button size="sm" variant="outline" className="bg-white">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="bg-white shadow-md hover:shadow-lg"
+              onClick={handleZoomOut}
+              title="ズームアウト"
+            >
               <ZoomOut className="w-4 h-4" />
             </Button>
-            <Button size="sm" variant="outline" className="bg-white">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="bg-white shadow-md hover:shadow-lg"
+              onClick={handleFitToView}
+              title="全体表示"
+            >
+              <Maximize className="w-4 h-4" />
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="bg-white shadow-md hover:shadow-lg"
+              onClick={handleResetView}
+              title="リセット"
+            >
               <RotateCcw className="w-4 h-4" />
             </Button>
           </div>
 
-          {/* 世代ラベル */}
-          <div className="absolute left-4 top-20 z-10">
-            {Array.from(new Set(processedPersons.map(p => p.generation))).sort().map((generation, index) => (
-              <div 
-                key={generation}
-                className="bg-white px-3 py-1 rounded-full shadow-sm border mb-4"
-                style={{ 
-                  position: 'absolute',
-                  top: `${60 + (generation - 1) * 180}px`
-                }}
-              >
-                <span className="text-sm font-medium text-gray-600">第{generation}世代</span>
-              </div>
-            ))}
+          {/* ズーム倍率表示 */}
+          <div className="absolute top-4 right-4 z-10">
+            <div className="bg-white px-3 py-1 rounded-full shadow-sm border">
+              <span className="text-sm font-medium text-gray-600">{Math.round(zoom * 100)}%</span>
+            </div>
           </div>
 
+          {/* 世代ラベル（固定位置） */}
+          {processedPersons.length > 0 && (
+            <div className="absolute left-4 top-0 bottom-0 z-20 pointer-events-none">
+              {Array.from(new Set(processedPersons.map(p => p.generation))).sort().map((generation) => {
+                const generationY = 80 + (generation - 1) * 250;
+                // 変換後の画面上でのY位置を計算
+                const screenY = generationY * zoom + panY;
+                
+                return (
+                  <div
+                    key={`generation-label-${generation}`}
+                    className="absolute bg-white px-3 py-1 rounded-full shadow-md border pointer-events-auto"
+                    style={{
+                      top: `${screenY - 15}px`,
+                      left: '0px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      backdropFilter: 'blur(4px)',
+                      zIndex: 30
+                    }}
+                  >
+                    <span className="text-sm font-medium text-gray-600">第{generation}世代</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* 家系図キャンバス */}
-          <div className="w-full h-full overflow-auto p-8">
-            <div className="relative min-w-[800px] min-h-[600px]">
+          <div 
+            ref={canvasRef}
+            className="w-full h-full overflow-hidden cursor-grab active:cursor-grabbing"
+            onMouseDown={handleCanvasMouseDown}
+            style={{
+              cursor: isPanning ? 'grabbing' : 'grab'
+            }}
+          >
+            <div 
+              className="relative min-w-[800px] min-h-[600px]"
+              style={{
+                transform: `translate(${panX}px, ${panY}px) scale(${zoom})`,
+                transformOrigin: '0 0',
+                transition: isPanning ? 'none' : 'transform 0.1s ease-out'
+              }}
+            >
               {/* 世代区切り線 */}
               <div className="absolute inset-0">
-                {Array.from(new Set(processedPersons.map(p => p.generation))).sort().map((generation) => (
-                  <div 
-                    key={`line-${generation}`}
-                    className="absolute left-0 right-0 h-px bg-gray-300 opacity-50"
-                    style={{ 
-                      top: `${60 + (generation - 1) * 180}px`
-                    }}
-                  ></div>
-                ))}
+                {Array.from(new Set(processedPersons.map(p => p.generation))).sort().map((generation) => {
+                  const generationY = 80 + (generation - 1) * 250;
+                  
+                  return (
+                    <div 
+                      key={`generation-line-${generation}`}
+                      className="absolute left-0 h-px bg-gray-300 opacity-50"
+                      style={{ 
+                        top: `${generationY}px`,
+                        width: '2000px' // 十分な幅を確保
+                      }}
+                    />
+                  );
+                })}
               </div>
 
               {/* 関係線 */}
@@ -1265,19 +1667,57 @@ export default function FamilyTreeApp() {
                     />
                   )
                 })}
+
+                {/* 兄弟姉妹関係線 */}
+                {findSiblingConnections.map((siblingGroup, groupIndex) => {
+                  if (siblingGroup.length < 2) return null
+                  
+                  // 兄弟姉妹グループの最も左と右のX座標を取得
+                  const leftMostX = Math.min(...siblingGroup.map(s => s.x))
+                  const rightMostX = Math.max(...siblingGroup.map(s => s.x))
+                  
+                  // 兄弟姉妹グループの共通Y座標（カードの上部により近く）
+                  const groupY = Math.min(...siblingGroup.map(s => s.y)) - 50
+                  
+                  return (
+                    <g key={`sibling-group-${groupIndex}`}>
+                      {/* 水平線（兄弟姉妹を結ぶ、上部に配置） */}
+                      <path
+                        d={`M ${leftMostX} ${groupY} L ${rightMostX} ${groupY}`}
+                        stroke="#10b981"
+                        strokeWidth="2"
+                        fill="none"
+                        opacity="0.8"
+                      />
+                      
+                      {/* 各兄弟姉妹への垂直線（上から下向き） */}
+                      {siblingGroup.map((sibling, siblingIndex) => (
+                        <path
+                          key={`sibling-${groupIndex}-${siblingIndex}`}
+                          d={`M ${sibling.x} ${groupY} L ${sibling.x} ${sibling.y - 30}`}
+                          stroke="#10b981"
+                          strokeWidth="2"
+                          fill="none"
+                          opacity="0.8"
+                        />
+                      ))}
+                    </g>
+                  )
+                })}
               </svg>
 
-              {/* 人物ノード */}
-              {processedPersons.map((person) => (
-                <div
-                  key={person.id}
-                  className={`absolute cursor-pointer transform -translate-x-1/2 -translate-y-1/2 ${
-                    selectedPerson?.id === person.id ? "ring-2 ring-blue-500" : ""
-                  }`}
-                  style={{ left: person.x, top: person.y }}
-                  onClick={() => setSelectedPerson(person)}
-                  onMouseDown={(e) => handleCardMouseDown(e, person)}
-                >
+                             {/* 人物ノード */}
+               {processedPersons.map((person) => (
+                 <div
+                   key={person.id}
+                   data-person-card
+                   className={`absolute cursor-pointer transform -translate-x-1/2 -translate-y-1/2 ${
+                     selectedPerson?.id === person.id ? "ring-2 ring-blue-500" : ""
+                   }`}
+                   style={{ left: person.x, top: person.y }}
+                   onClick={() => setSelectedPerson(person)}
+                   onMouseDown={(e) => handleCardMouseDown(e, person)}
+                 >
                   <Card
                     className={`w-40 ${person.isUncertain ? "border-dashed border-yellow-400 bg-yellow-50" : 
                       person.sex === "male" ? "bg-blue-50 border-blue-200" : 
@@ -1567,6 +2007,17 @@ export default function FamilyTreeApp() {
                 variant="outline"
                 size="sm"
                 className="flex flex-col items-center gap-1 h-auto py-3 bg-transparent"
+                onClick={handleEditNodeOpen}
+                disabled={!selectedPerson}
+              >
+                <Edit3 className="w-4 h-4" />
+                <span className="text-xs">ノード編集</span>
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex flex-col items-center gap-1 h-auto py-3 bg-transparent"
                 onClick={handleDeletePerson}
                 disabled={!selectedPerson}
               >
@@ -1584,6 +2035,217 @@ export default function FamilyTreeApp() {
                 <span className="text-xs">レイアウト</span>
               </Button>
             </div>
+
+            {/* ノード編集ダイアログ */}
+            <Dialog open={isEditNodeDialogOpen} onOpenChange={setIsEditNodeDialogOpen}>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>ノード編集 - {selectedPerson?.displayName}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-6 py-4">
+                  {/* 基本情報 */}
+                  <div className="space-y-4">
+                    <h4 className="text-lg font-semibold">基本情報</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="edit-surname">姓</Label>
+                        <Input
+                          id="edit-surname"
+                          value={editNodeForm.surname}
+                          onChange={(e) => setEditNodeForm(prev => ({ ...prev, surname: e.target.value }))}
+                          placeholder="田中"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-givenName">名</Label>
+                        <Input
+                          id="edit-givenName"
+                          value={editNodeForm.givenName}
+                          onChange={(e) => setEditNodeForm(prev => ({ ...prev, givenName: e.target.value }))}
+                          placeholder="太郎"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-birthDate">生年月日</Label>
+                        <Input
+                          id="edit-birthDate"
+                          type="date"
+                          value={editNodeForm.birthDate}
+                          onChange={(e) => setEditNodeForm(prev => ({ ...prev, birthDate: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-birthPlace">出生地</Label>
+                        <Input
+                          id="edit-birthPlace"
+                          value={editNodeForm.birthPlace}
+                          onChange={(e) => setEditNodeForm(prev => ({ ...prev, birthPlace: e.target.value }))}
+                          placeholder="東京都"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-deathDate">没年月日</Label>
+                        <Input
+                          id="edit-deathDate"
+                          type="date"
+                          value={editNodeForm.deathDate}
+                          onChange={(e) => setEditNodeForm(prev => ({ ...prev, deathDate: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-deathPlace">没地</Label>
+                        <Input
+                          id="edit-deathPlace"
+                          value={editNodeForm.deathPlace}
+                          onChange={(e) => setEditNodeForm(prev => ({ ...prev, deathPlace: e.target.value }))}
+                          placeholder="東京都"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 親子関係 */}
+                  <div className="space-y-4">
+                    <h4 className="text-lg font-semibold">親子関係</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="edit-father">父</Label>
+                        <Select value={editNodeForm.father} onValueChange={(value) => setEditNodeForm(prev => ({ ...prev, father: value }))}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="父を選択" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">なし</SelectItem>
+                            {availablePersons.filter((p: AvailablePerson) => p.id !== selectedPerson?.id).map((person: AvailablePerson) => (
+                              <SelectItem key={person.id} value={person.id}>{person.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-mother">母</Label>
+                        <Select value={editNodeForm.mother} onValueChange={(value) => setEditNodeForm(prev => ({ ...prev, mother: value }))}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="母を選択" />
+                          </SelectTrigger>
+                                                     <SelectContent>
+                             <SelectItem value="none">なし</SelectItem>
+                             {availablePersons.filter((p: AvailablePerson) => p.id !== selectedPerson?.id).map((person: AvailablePerson) => (
+                               <SelectItem key={person.id} value={person.id}>{person.name}</SelectItem>
+                             ))}
+                           </SelectContent>
+                         </Select>
+                       </div>
+                       <div>
+                         <Label htmlFor="edit-adoptiveFather">養父</Label>
+                         <Select value={editNodeForm.adoptiveFather} onValueChange={(value) => setEditNodeForm(prev => ({ ...prev, adoptiveFather: value }))}>
+                           <SelectTrigger>
+                             <SelectValue placeholder="養父を選択" />
+                           </SelectTrigger>
+                           <SelectContent>
+                             <SelectItem value="none">なし</SelectItem>
+                             {availablePersons.filter((p: AvailablePerson) => p.id !== selectedPerson?.id).map((person: AvailablePerson) => (
+                               <SelectItem key={person.id} value={person.id}>{person.name}</SelectItem>
+                             ))}
+                           </SelectContent>
+                         </Select>
+                       </div>
+                       <div>
+                         <Label htmlFor="edit-adoptiveMother">養母</Label>
+                         <Select value={editNodeForm.adoptiveMother} onValueChange={(value) => setEditNodeForm(prev => ({ ...prev, adoptiveMother: value }))}>
+                           <SelectTrigger>
+                             <SelectValue placeholder="養母を選択" />
+                           </SelectTrigger>
+                           <SelectContent>
+                             <SelectItem value="none">なし</SelectItem>
+                            {availablePersons.filter((p: AvailablePerson) => p.id !== selectedPerson?.id).map((person: AvailablePerson) => (
+                              <SelectItem key={person.id} value={person.id}>{person.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 婚姻関係 */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-lg font-semibold">婚姻関係</h4>
+                      <Button onClick={handleAddSpouse} size="sm" variant="outline">
+                        <Plus className="w-4 h-4 mr-2" />
+                        配偶者追加
+                      </Button>
+                    </div>
+                    {editNodeForm.spouses.length === 0 ? (
+                      <p className="text-gray-500 text-sm">配偶者なし</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {editNodeForm.spouses.map((spouse, index) => (
+                          <div key={index} className="border rounded-lg p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h5 className="font-medium">配偶者 {index + 1}</h5>
+                              <Button
+                                onClick={() => handleRemoveSpouse(index)}
+                                size="sm"
+                                variant="destructive"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              <div>
+                                <Label>氏名</Label>
+                                <Input
+                                  value={spouse.name}
+                                  onChange={(e) => {
+                                    const updatedSpouses = [...editNodeForm.spouses]
+                                    updatedSpouses[index].name = e.target.value
+                                    setEditNodeForm(prev => ({ ...prev, spouses: updatedSpouses }))
+                                  }}
+                                  placeholder="田中花子"
+                                />
+                              </div>
+                              <div>
+                                <Label>結婚日</Label>
+                                <Input
+                                  type="date"
+                                  value={spouse.marriageDate}
+                                  onChange={(e) => {
+                                    const updatedSpouses = [...editNodeForm.spouses]
+                                    updatedSpouses[index].marriageDate = e.target.value
+                                    setEditNodeForm(prev => ({ ...prev, spouses: updatedSpouses }))
+                                  }}
+                                />
+                              </div>
+                              <div>
+                                <Label>離婚日（任意）</Label>
+                                <Input
+                                  type="date"
+                                  value={spouse.divorceDate}
+                                  onChange={(e) => {
+                                    const updatedSpouses = [...editNodeForm.spouses]
+                                    updatedSpouses[index].divorceDate = e.target.value
+                                    setEditNodeForm(prev => ({ ...prev, spouses: updatedSpouses }))
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setIsEditNodeDialogOpen(false)}>
+                    キャンセル
+                  </Button>
+                  <Button onClick={handleEditNodeSave}>
+                    保存
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
 
           {/* 選択中ノードの情報表示 */}
