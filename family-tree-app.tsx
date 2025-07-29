@@ -230,12 +230,12 @@ export default function FamilyTreeApp() {
               保存
             </Button>
             <Button variant="outline" size="sm">
-              <Upload className="w-4 h-4 mr-2" />
+              <Download className="w-4 h-4 mr-2" />
               読み込み
             </Button>
             <Button variant="outline" size="sm">
-              <Download className="w-4 h-4 mr-2" />
-              エクスポート
+              <Upload className="w-4 h-4 mr-2" />
+              書き出し
             </Button>
           </div>
         </div>
