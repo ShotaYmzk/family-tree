@@ -37,6 +37,7 @@ interface FamilyMember {
     surname: string
     given_name: string
   }
+  sex?: string
   birth?: {
     date: string
     place?: string
@@ -115,20 +116,15 @@ export default function FamilyTreeApp() {
   const [isAddPersonDialogOpen, setIsAddPersonDialogOpen] = useState(false)
   const [isAddRelationshipDialogOpen, setIsAddRelationshipDialogOpen] = useState(false)
   const [familyData, setFamilyData] = useState<any>({ family_members: [] })
-
-  // Load family data from JSON file
-  useEffect(() => {
-    const loadFamilyData = async () => {
-      try {
-        const response = await fetch('/family-info.json')
-        const data = await response.json()
-        setFamilyData(data)
-      } catch (error) {
-        console.error('Failed to load family data:', error)
-      }
-    }
-    loadFamilyData()
-  }, [])
+  const [isLoading, setIsLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState("")
+  const containerRef = useRef<HTMLDivElement>(null)
+  
+  // ドラッグ&ドロップ用のstate
+  const [isDragging, setIsDragging] = useState(false)
+  const [draggedPerson, setDraggedPerson] = useState<ProcessedPerson | null>(null)
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [personPositions, setPersonPositions] = useState<Record<string, { x: number, y: number }>>({})
 
   // 新しい人物追加フォーム用のstate
   const [newPersonForm, setNewPersonForm] = useState({
@@ -154,11 +150,21 @@ export default function FamilyTreeApp() {
     divorceDate: "",
   })
 
-  const containerRef = useRef<HTMLDivElement>(null)
+  // Load family data from JSON file
+  useEffect(() => {
+    const loadFamilyData = async () => {
+      try {
+        const response = await fetch('/family-info.json')
+        const data = await response.json()
+        setFamilyData(data)
+      } catch (error) {
+        console.error('Failed to load family data:', error)
+      }
+    }
+    loadFamilyData()
+  }, [])
 
-  // 提供されたJSONデータ（削除 - familyDataに移行）
-
-  // 家系図データを処理する関数
+  // 家系図データを処理する関数（改良されたレイアウト）
   const processedPersons = useMemo(() => {
     if (!familyData.family_members || familyData.family_members.length === 0) {
       return []
@@ -166,7 +172,7 @@ export default function FamilyTreeApp() {
 
     const persons: ProcessedPerson[] = []
     
-    // generationごとに人物を分類
+    // 世代ごとに人物を分類
     const generationGroups = new Map<number, any[]>()
     familyData.family_members.forEach((person: any) => {
       const generation = person.generation || 1
@@ -176,72 +182,380 @@ export default function FamilyTreeApp() {
       generationGroups.get(generation)!.push(person)
     })
 
-    // 各世代の人物を配置
-    generationGroups.forEach((people, generation) => {
-      people.forEach((person: any, index: number) => {
-        const displayName = `${person.name.surname} ${person.name.given_name}`.trim()
-        const spacing = 180
-        const baseX = 100 + (spacing * index)
-        const baseY = 80 + (generation - 1) * 180
+    // 家族グループを特定（結婚関係を基に）
+    const familyUnits = new Map<string, {husband: any, wives: any[], children: any[]}>()
+    
+    // 男性を中心とした家族単位を作成
+    familyData.family_members.forEach((person: any) => {
+      if (person.sex === 'male' && (person.spouse || (person.spouses && person.spouses.length > 0))) {
+        const wives: any[] = []
+        
+        // 配偶者を探す
+        if (person.spouse?.name) {
+          const wife = familyData.family_members.find((p: any) => 
+            `${p.name.surname} ${p.name.given_name}`.trim() === person.spouse.name.trim()
+          )
+          if (wife) wives.push(wife)
+        }
+        
+        if (person.spouses && person.spouses.length > 0) {
+          person.spouses.forEach((spouse: any) => {
+            const wife = familyData.family_members.find((p: any) => 
+              `${p.name.surname} ${p.name.given_name}`.trim() === spouse.name.trim()
+            )
+            if (wife && !wives.find(w => w.id === wife.id)) {
+              wives.push(wife)
+            }
+          })
+        }
+
+        // 子供を探す
+        const children: any[] = []
+        if (person.children && person.children.length > 0) {
+          person.children.forEach((childInfo: any) => {
+            const child = familyData.family_members.find((p: any) => 
+              `${p.name.surname} ${p.name.given_name}`.trim() === childInfo.name.trim()
+            )
+            if (child) {
+              children.push({...child, motherName: childInfo.mother})
+            }
+          })
+        }
+
+        if (wives.length > 0) {
+          familyUnits.set(person.id, {
+            husband: person,
+            wives,
+            children
+          })
+        }
+      }
+    })
+
+    // 既に家族単位に含まれている人物をトラック
+    const assignedPersons = new Set<string>()
+
+    let currentX = 100
+    const generationSpacing = 250    // 世代間隔を増加
+    const minFamilySpacing = 450     // 家族間の最小間隔をさらに増加
+    const cardSpacing = 200          // カード間の最小間隔を増加
+    const spouseSpacing = 180        // 配偶者間の間隔をさらに増加
+    const cardWidth = 160            // カードの幅（重複チェック用）
+
+    // 世代順にレイアウト
+    Array.from(generationGroups.keys()).sort((a, b) => a - b).forEach(generation => {
+      const generationY = 80 + (generation - 1) * generationSpacing
+      let generationX = currentX
+
+      // この世代の家族単位を処理
+      const generationFamilies = Array.from(familyUnits.values()).filter(
+        family => family.husband.generation === generation
+      )
+
+      generationFamilies.forEach(family => {
+        const husband = family.husband
+        const wives = family.wives
+
+        if (wives.length === 1) {
+          // 一夫一妻：夫婦を並べて配置
+          const wife = wives[0]
+          
+          const wifePosition = personPositions[wife.id] || { x: generationX, y: generationY }
+          const husbandPosition = personPositions[husband.id] || { x: generationX + spouseSpacing, y: generationY }
+          
+          persons.push({
+            ...wife,
+            displayName: `${wife.name.surname} ${wife.name.given_name}`.trim(),
+            generation,
+            x: wifePosition.x,
+            y: wifePosition.y,
+            isUncertain: false,
+          })
+          
+          persons.push({
+            ...husband,
+            displayName: `${husband.name.surname} ${husband.name.given_name}`.trim(),
+            generation,
+            x: husbandPosition.x,
+            y: husbandPosition.y,
+            isUncertain: false,
+          })
+
+          assignedPersons.add(wife.id)
+          assignedPersons.add(husband.id)
+          generationX += minFamilySpacing
+
+        } else if (wives.length > 1) {
+          // 一夫多妻：女性=男性=女性の配置
+          const totalSpan = (wives.length + 1) * spouseSpacing
+          const startX = generationX
+
+          // 夫を中央に配置
+          const husbandX = startX + Math.floor(wives.length / 2) * spouseSpacing
+          const husbandPosition = personPositions[husband.id] || { x: husbandX, y: generationY }
+          
+          persons.push({
+            ...husband,
+            displayName: `${husband.name.surname} ${husband.name.given_name}`.trim(),
+            generation,
+            x: husbandPosition.x,
+            y: husbandPosition.y,
+            isUncertain: false,
+          })
+          assignedPersons.add(husband.id)
+
+          // 妻たちを夫の左右に配置
+          wives.forEach((wife, index) => {
+            let wifeX: number
+            if (index < Math.floor(wives.length / 2)) {
+              // 夫の左側
+              wifeX = startX + index * spouseSpacing
+            } else {
+              // 夫の右側（夫の位置をスキップ）
+              wifeX = startX + (index + 1) * spouseSpacing
+            }
+            
+            const wifePosition = personPositions[wife.id] || { x: wifeX, y: generationY }
+            
+            persons.push({
+              ...wife,
+              displayName: `${wife.name.surname} ${wife.name.given_name}`.trim(),
+              generation,
+              x: wifePosition.x,
+              y: wifePosition.y,
+              isUncertain: false,
+            })
+            assignedPersons.add(wife.id)
+          })
+
+          generationX += totalSpan + minFamilySpacing
+        }
+      })
+
+      // 家族単位に含まれない独身者を配置
+      const singlePersons = generationGroups.get(generation)!.filter(
+        (person: any) => !assignedPersons.has(person.id)
+      )
+
+      // 独身者の配置では重複をより厳密にチェック
+      singlePersons.forEach((person: any) => {
+        // 既存の人物と重ならないようにX位置を調整
+        let proposedX = generationX
+        let collision = true
+        
+        while (collision) {
+          collision = persons.some(existing => 
+            existing.generation === generation && 
+            Math.abs(existing.x - proposedX) < (cardSpacing + cardWidth)
+          )
+          if (collision) {
+            proposedX += cardSpacing
+          }
+        }
+
+        const position = personPositions[person.id] || { x: proposedX, y: generationY }
 
         persons.push({
           ...person,
-          displayName,
+          displayName: `${person.name.surname} ${person.name.given_name}`.trim(),
           generation,
-          x: baseX,
-          y: baseY,
+          x: position.x,
+          y: position.y,
           isUncertain: false,
         })
+        generationX = proposedX + cardSpacing
+        assignedPersons.add(person.id)
       })
     })
 
     return persons
-  }, [familyData.family_members])
+  }, [familyData.family_members, personPositions])
 
-  // 結婚関係を探す関数
-  const findMarriageConnections = useMemo(() => {
-    const connections: Array<{person1: ProcessedPerson, person2: ProcessedPerson, isMarried: boolean}> = []
-    
-    processedPersons.forEach(person1 => {
+  // 結婚・家族グループを作成する関数
+  const createFamilyGroups = useMemo(() => {
+    const familyGroups: Array<{
+      husband: ProcessedPerson
+      wives: ProcessedPerson[]
+      marriageLines: Array<{x1: number, y1: number, x2: number, y2: number}>
+      childrenLines: Array<{
+        fromX: number,
+        fromY: number,
+        toX: number,
+        toY: number,
+        child: ProcessedPerson
+      }>
+    }> = []
+
+    // すべての配偶者関係を双方向で検出
+    const marriageConnections = new Set<string>()
+    const addedConnections = new Set<string>()
+
+    // 各人物の配偶者関係をチェック
+    processedPersons.forEach(person => {
       // spouse フィールドがある場合
-      if (person1.spouse) {
-        const spouseName = person1.spouse.name
-        const person2 = processedPersons.find(p => 
-          `${p.name.surname} ${p.name.given_name}`.trim() === spouseName.trim()
+      if (person.spouse?.name) {
+        const spouse = processedPersons.find(p => 
+          `${p.name.surname} ${p.name.given_name}`.trim() === person.spouse!.name.trim()
         )
-        if (person2) {
-          // 既に追加されていないかチェック
-          const exists = connections.some(conn => 
-            (conn.person1.id === person1.id && conn.person2.id === person2.id) ||
-            (conn.person1.id === person2.id && conn.person2.id === person1.id)
-          )
-          if (!exists) {
-            connections.push({person1, person2, isMarried: true})
-          }
+        if (spouse) {
+          const connectionKey = [person.id, spouse.id].sort().join('-')
+          marriageConnections.add(connectionKey)
         }
       }
 
       // spouses 配列がある場合
-      if (person1.spouses && person1.spouses.length > 0) {
-        person1.spouses.forEach((spouse: any) => {
-          const person2 = processedPersons.find(p => 
-            `${p.name.surname} ${p.name.given_name}`.trim() === spouse.name.trim()
+      if (person.spouses && person.spouses.length > 0) {
+        person.spouses.forEach((spouseInfo: any) => {
+          const spouse = processedPersons.find(p => 
+            `${p.name.surname} ${p.name.given_name}`.trim() === spouseInfo.name.trim()
           )
-          if (person2) {
-            const exists = connections.some(conn => 
-              (conn.person1.id === person1.id && conn.person2.id === person2.id) ||
-              (conn.person1.id === person2.id && conn.person2.id === person1.id)
-            )
-            if (!exists) {
-              connections.push({person1, person2, isMarried: true})
-            }
+          if (spouse) {
+            const connectionKey = [person.id, spouse.id].sort().join('-')
+            marriageConnections.add(connectionKey)
           }
         })
       }
     })
 
-    return connections
+    // 男性を中心とした家族グループを作成（従来の構造を維持）
+    processedPersons.forEach(person => {
+      if (person.sex === 'male' && (person.spouse || (person.spouses && person.spouses.length > 0))) {
+        const wives: ProcessedPerson[] = []
+        
+        // spouse フィールドがある場合
+        if (person.spouse?.name) {
+          const wife = processedPersons.find(p => 
+            `${p.name.surname} ${p.name.given_name}`.trim() === person.spouse!.name.trim()
+          )
+          if (wife) wives.push(wife)
+        }
+
+        // spouses 配列がある場合
+        if (person.spouses && person.spouses.length > 0) {
+          person.spouses.forEach((spouse: any) => {
+            const wife = processedPersons.find(p => 
+              `${p.name.surname} ${p.name.given_name}`.trim() === spouse.name.trim()
+            )
+            if (wife && !wives.find(w => w.id === wife.id)) {
+              wives.push(wife)
+            }
+          })
+        }
+
+        if (wives.length > 0) {
+          // 結婚線の計算（二重線）
+          const marriageLines: Array<{x1: number, y1: number, x2: number, y2: number}> = []
+          
+          wives.forEach(wife => {
+            const connectionKey = [person.id, wife.id].sort().join('-')
+            if (!addedConnections.has(connectionKey)) {
+              marriageLines.push({
+                x1: person.x,
+                y1: person.y,
+                x2: wife.x,
+                y2: wife.y
+              })
+              addedConnections.add(connectionKey)
+            }
+          })
+
+          // 子供への線の計算
+          const childrenLines: Array<{fromX: number, fromY: number, toX: number, toY: number, child: ProcessedPerson, mother?: string}> = []
+          
+          if (person.children && person.children.length > 0) {
+            person.children.forEach((childInfo: any) => {
+              const child = processedPersons.find(p => 
+                `${p.name.surname} ${p.name.given_name}`.trim() === childInfo.name.trim()
+              )
+              if (child) {
+                // どの妻の子供かを判定
+                let motherWife: ProcessedPerson | undefined
+                if (childInfo.mother) {
+                  motherWife = wives.find(wife => 
+                    `${wife.name.surname} ${wife.name.given_name}`.includes(childInfo.mother) ||
+                    childInfo.mother.includes(`${wife.name.surname} ${wife.name.given_name}`) ||
+                    wife.name.given_name === childInfo.mother
+                  )
+                }
+
+                // 結婚線の中点から子供へ
+                let marriageLineCenterX: number
+                let marriageLineCenterY: number
+                
+                if (wives.length === 1) {
+                  // 一夫一妻の場合：夫と妻の中点
+                  marriageLineCenterX = (person.x + wives[0].x) / 2
+                  marriageLineCenterY = (person.y + wives[0].y) / 2
+                } else if (motherWife) {
+                  // 複数の妻がいる場合：特定の母親との中点
+                  marriageLineCenterX = (person.x + motherWife.x) / 2
+                  marriageLineCenterY = (person.y + motherWife.y) / 2
+                } else {
+                  // 母親が特定できない場合：夫の位置から
+                  marriageLineCenterX = person.x
+                  marriageLineCenterY = person.y
+                }
+
+                childrenLines.push({
+                  fromX: marriageLineCenterX,
+                  fromY: marriageLineCenterY + 20, // 結婚線の少し下から
+                  toX: child.x,
+                  toY: child.y - 40, // 子供カードの上部に接続
+                  child,
+                  mother: childInfo.mother
+                })
+              }
+            })
+          }
+
+          familyGroups.push({
+            husband: person,
+            wives,
+            marriageLines,
+            childrenLines
+          })
+        }
+      }
+    })
+
+    // 男性中心でない結婚関係を追加（女性同士や、データで男性として処理されていない場合）
+    marriageConnections.forEach(connectionKey => {
+      if (!addedConnections.has(connectionKey)) {
+        const [id1, id2] = connectionKey.split('-')
+        const person1 = processedPersons.find(p => p.id === id1)
+        const person2 = processedPersons.find(p => p.id === id2)
+        
+        if (person1 && person2) {
+          // 簡易的な家族グループとして追加
+          familyGroups.push({
+            husband: person1, // 便宜上husband扱い
+            wives: [person2],
+            marriageLines: [{
+              x1: person1.x,
+              y1: person1.y,
+              x2: person2.x,
+              y2: person2.y
+            }],
+            childrenLines: []
+          })
+          addedConnections.add(connectionKey)
+        }
+      }
+    })
+
+    return familyGroups
   }, [processedPersons])
+
+  // 旧来の結婚関係を探す関数（下位互換性のため保持）
+  const findMarriageConnections = useMemo(() => {
+    return createFamilyGroups.flatMap(group => 
+      group.marriageLines.map(line => ({
+        person1: group.husband,
+        person2: group.wives[0], // 簡略化
+        isMarried: true
+      }))
+    )
+  }, [createFamilyGroups])
 
   // 親子関係を探す関数
   const findParentChildConnections = useMemo(() => {
@@ -321,6 +635,61 @@ export default function FamilyTreeApp() {
       }
     }
   }, [isResizing, handleMouseMove, handleMouseUp])
+
+  // ドラッグ&ドロップのハンドラー関数
+  const handleCardMouseDown = useCallback((e: React.MouseEvent, person: ProcessedPerson) => {
+    if (e.button !== 0) return // 左クリックのみ
+    
+    e.preventDefault()
+    setIsDragging(true)
+    setDraggedPerson(person)
+    
+    const rect = e.currentTarget.getBoundingClientRect()
+    setDragOffset({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    })
+  }, [])
+
+  const handleCardMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDragging || !draggedPerson) return
+    
+    e.preventDefault()
+    
+    // スクロールコンテナからの相対位置を計算
+    const scrollContainer = document.querySelector('.w-full.h-full.overflow-auto.p-8')
+    if (!scrollContainer) return
+    
+    const containerRect = scrollContainer.getBoundingClientRect()
+    const newX = e.clientX - containerRect.left - dragOffset.x + scrollContainer.scrollLeft
+    const newY = e.clientY - containerRect.top - dragOffset.y + scrollContainer.scrollTop
+    
+    setPersonPositions(prev => ({
+      ...prev,
+      [draggedPerson.id]: { x: newX, y: newY }
+    }))
+  }, [isDragging, draggedPerson, dragOffset])
+
+  const handleCardMouseUp = useCallback(() => {
+    setIsDragging(false)
+    setDraggedPerson(null)
+    setDragOffset({ x: 0, y: 0 })
+  }, [])
+
+  // マウスイベントのグローバルリスナー
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleCardMouseMove)
+      document.addEventListener('mouseup', handleCardMouseUp)
+      document.body.style.cursor = 'grabbing'
+      
+      return () => {
+        document.removeEventListener('mousemove', handleCardMouseMove)
+        document.removeEventListener('mouseup', handleCardMouseUp)
+        document.body.style.cursor = 'default'
+      }
+    }
+  }, [isDragging, handleCardMouseMove, handleCardMouseUp])
 
   // 編集機能のハンドラー関数群
   const handleAddPerson = () => {
@@ -703,33 +1072,199 @@ export default function FamilyTreeApp() {
 
               {/* 関係線 */}
               <svg className="absolute inset-0 w-full h-full pointer-events-none">
-                {/* 結婚関係線 (太線) */}
-                {findMarriageConnections.map((connection, index) => (
-                  <line
-                    key={`marriage-${index}`}
-                    x1={connection.person1.x}
-                    y1={connection.person1.y}
-                    x2={connection.person2.x}
-                    y2={connection.person2.y}
-                    stroke="#dc2626"
-                    strokeWidth="3"
-                    opacity="0.8"
-                  />
+                {/* 結婚関係線 (二重線) */}
+                {createFamilyGroups.map((family, familyIndex) => (
+                  <g key={`family-${familyIndex}`}>
+                    {family.marriageLines.map((line, lineIndex) => {
+                      // 縦横の線で接続（L字型）
+                      const midX = (line.x1 + line.x2) / 2
+                      const cornerRadius = 8
+                      
+                      // 横線が上か下かを判定
+                      const isHorizontalFirst = Math.abs(line.x2 - line.x1) > Math.abs(line.y2 - line.y1)
+                      
+                      let path1: string
+                      let path2: string
+                      
+                      if (isHorizontalFirst) {
+                        // 水平→垂直の順で接続
+                        if (line.x1 < line.x2) {
+                          // 左から右へ
+                          if (line.y1 < line.y2) {
+                            // 上から下へ
+                            path1 = `M ${line.x1} ${line.y1 - 2} L ${midX - cornerRadius} ${line.y1 - 2} Q ${midX} ${line.y1 - 2} ${midX} ${line.y1 + cornerRadius - 2} L ${midX} ${line.y2 - 2}`
+                            path2 = `M ${line.x1} ${line.y1 + 2} L ${midX - cornerRadius} ${line.y1 + 2} Q ${midX} ${line.y1 + 2} ${midX} ${line.y1 + cornerRadius + 2} L ${midX} ${line.y2 + 2}`
+                          } else {
+                            // 下から上へ
+                            path1 = `M ${line.x1} ${line.y1 - 2} L ${midX - cornerRadius} ${line.y1 - 2} Q ${midX} ${line.y1 - 2} ${midX} ${line.y1 - cornerRadius - 2} L ${midX} ${line.y2 - 2}`
+                            path2 = `M ${line.x1} ${line.y1 + 2} L ${midX - cornerRadius} ${line.y1 + 2} Q ${midX} ${line.y1 + 2} ${midX} ${line.y1 - cornerRadius + 2} L ${midX} ${line.y2 + 2}`
+                          }
+                        } else {
+                          // 右から左へ
+                          if (line.y1 < line.y2) {
+                            // 上から下へ
+                            path1 = `M ${line.x1} ${line.y1 - 2} L ${midX + cornerRadius} ${line.y1 - 2} Q ${midX} ${line.y1 - 2} ${midX} ${line.y1 + cornerRadius - 2} L ${midX} ${line.y2 - 2}`
+                            path2 = `M ${line.x1} ${line.y1 + 2} L ${midX + cornerRadius} ${line.y1 + 2} Q ${midX} ${line.y1 + 2} ${midX} ${line.y1 + cornerRadius + 2} L ${midX} ${line.y2 + 2}`
+                          } else {
+                            // 下から上へ
+                            path1 = `M ${line.x1} ${line.y1 - 2} L ${midX + cornerRadius} ${line.y1 - 2} Q ${midX} ${line.y1 - 2} ${midX} ${line.y1 - cornerRadius - 2} L ${midX} ${line.y2 - 2}`
+                            path2 = `M ${line.x1} ${line.y1 + 2} L ${midX + cornerRadius} ${line.y1 + 2} Q ${midX} ${line.y1 + 2} ${midX} ${line.y1 - cornerRadius + 2} L ${midX} ${line.y2 + 2}`
+                          }
+                        }
+                        
+                        // 第二セグメント（垂直から水平）
+                        if (line.y2 < line.y1) {
+                          // 上向き
+                          if (midX < line.x2) {
+                            path1 += ` Q ${midX} ${line.y2 - 2} ${midX + cornerRadius} ${line.y2 - 2} L ${line.x2} ${line.y2 - 2}`
+                            path2 += ` Q ${midX} ${line.y2 + 2} ${midX + cornerRadius} ${line.y2 + 2} L ${line.x2} ${line.y2 + 2}`
+                          } else {
+                            path1 += ` Q ${midX} ${line.y2 - 2} ${midX - cornerRadius} ${line.y2 - 2} L ${line.x2} ${line.y2 - 2}`
+                            path2 += ` Q ${midX} ${line.y2 + 2} ${midX - cornerRadius} ${line.y2 + 2} L ${line.x2} ${line.y2 + 2}`
+                          }
+                        } else {
+                          // 下向き
+                          if (midX < line.x2) {
+                            path1 += ` Q ${midX} ${line.y2 - 2} ${midX + cornerRadius} ${line.y2 - 2} L ${line.x2} ${line.y2 - 2}`
+                            path2 += ` Q ${midX} ${line.y2 + 2} ${midX + cornerRadius} ${line.y2 + 2} L ${line.x2} ${line.y2 + 2}`
+                          } else {
+                            path1 += ` Q ${midX} ${line.y2 - 2} ${midX - cornerRadius} ${line.y2 - 2} L ${line.x2} ${line.y2 - 2}`
+                            path2 += ` Q ${midX} ${line.y2 + 2} ${midX - cornerRadius} ${line.y2 + 2} L ${line.x2} ${line.y2 + 2}`
+                          }
+                        }
+                      } else {
+                        // シンプルな水平線（同じY位置の場合）
+                        path1 = `M ${line.x1} ${line.y1 - 2} L ${line.x2} ${line.y2 - 2}`
+                        path2 = `M ${line.x1} ${line.y1 + 2} L ${line.x2} ${line.y2 + 2}`
+                      }
+                      
+                      return (
+                        <g key={`marriage-line-${lineIndex}`}>
+                          {/* 1本目の線 */}
+                          <path
+                            d={path1}
+                            stroke="#dc2626"
+                            strokeWidth="2"
+                            fill="none"
+                            opacity="0.8"
+                          />
+                          {/* 2本目の線 */}
+                          <path
+                            d={path2}
+                            stroke="#dc2626"
+                            strokeWidth="2"
+                            fill="none"
+                            opacity="0.8"
+                          />
+                        </g>
+                      )
+                    })}
+                    
+                    {/* 子供への線 */}
+                    {(() => {
+                      // 同じ起点を持つ子供たちをグループ化
+                      const childGroups = new Map<string, typeof family.childrenLines>()
+                      family.childrenLines.forEach(childLine => {
+                        const key = `${childLine.fromX}-${childLine.fromY}`
+                        if (!childGroups.has(key)) {
+                          childGroups.set(key, [])
+                        }
+                        childGroups.get(key)!.push(childLine)
+                      })
+
+                      return Array.from(childGroups.entries()).map(([key, children], groupIndex) => {
+                        const cornerRadius = 8
+                        
+                        if (children.length === 1) {
+                          // 子供が1人の場合：L字型の接続
+                          const child = children[0]
+                          const midY = child.fromY + 30
+                          
+                          const pathToChild = child.fromX === child.toX 
+                            ? `M ${child.fromX} ${child.fromY} L ${child.toX} ${child.toY}` // 直線
+                            : `M ${child.fromX} ${child.fromY} L ${child.fromX} ${midY - cornerRadius} Q ${child.fromX} ${midY} ${child.fromX + (child.toX > child.fromX ? cornerRadius : -cornerRadius)} ${midY} L ${child.toX - (child.toX > child.fromX ? cornerRadius : -cornerRadius)} ${midY} Q ${child.toX} ${midY} ${child.toX} ${midY + cornerRadius} L ${child.toX} ${child.toY}`
+                          
+                          return (
+                            <g key={`child-group-${groupIndex}`}>
+                              <path
+                                d={pathToChild}
+                                stroke="#6b7280"
+                                strokeWidth="2"
+                                fill="none"
+                                opacity="0.7"
+                              />
+                            </g>
+                          )
+                        } else {
+                          // 複数の子供がいる場合：T字型の分岐
+                          const firstChild = children[0]
+                          const childXPositions = children.map(c => c.toX).sort((a, b) => a - b)
+                          const leftMostX = Math.min(...childXPositions)
+                          const rightMostX = Math.max(...childXPositions)
+                          const midY = firstChild.fromY + 30
+                          
+                          return (
+                            <g key={`child-group-${groupIndex}`}>
+                              {/* 共通垂直線 */}
+                              <path
+                                d={`M ${firstChild.fromX} ${firstChild.fromY} L ${firstChild.fromX} ${midY - cornerRadius} Q ${firstChild.fromX} ${midY} ${firstChild.fromX + (leftMostX < firstChild.fromX ? -cornerRadius : cornerRadius)} ${midY}`}
+                                stroke="#6b7280"
+                                strokeWidth="2"
+                                fill="none"
+                                opacity="0.7"
+                              />
+                              {/* 水平分岐線 */}
+                              <path
+                                d={`M ${leftMostX + cornerRadius < firstChild.fromX ? leftMostX : firstChild.fromX - cornerRadius} ${midY} L ${rightMostX - cornerRadius > firstChild.fromX ? rightMostX : firstChild.fromX + cornerRadius} ${midY}`}
+                                stroke="#6b7280"
+                                strokeWidth="2"
+                                fill="none"
+                                opacity="0.7"
+                              />
+                              {/* 各子供への個別の線 */}
+                              {children.map((child, childIndex) => (
+                                <path
+                                  key={`child-individual-${childIndex}`}
+                                  d={`M ${child.toX} ${midY} Q ${child.toX} ${midY + cornerRadius} ${child.toX} ${midY + cornerRadius} L ${child.toX} ${child.toY}`}
+                                  stroke="#6b7280"
+                                  strokeWidth="2"
+                                  fill="none"
+                                  opacity="0.7"
+                                />
+                              ))}
+                            </g>
+                          )
+                        }
+                      })
+                    })()}
+                  </g>
                 ))}
 
-                {/* 親子関係線 */}
-                {findParentChildConnections.map((connection, index) => (
-                  <line
-                    key={`parent-child-${index}`}
-                    x1={connection.parent.x}
-                    y1={connection.parent.y + 20}
-                    x2={connection.child.x}
-                    y2={connection.child.y - 20}
-                    stroke="#6b7280"
-                    strokeWidth="2"
-                    opacity="0.7"
-                  />
-                ))}
+                {/* 旧来の親子関係線 (結婚関係に含まれない親子関係用) */}
+                {findParentChildConnections.filter(connection => {
+                  // 既に家族グループで処理された子供は除外
+                  return !createFamilyGroups.some(family => 
+                    family.childrenLines.some(childLine => childLine.child.id === connection.child.id)
+                  )
+                }).map((connection, index) => {
+                  const cornerRadius = 8
+                  const midY = (connection.parent.y + connection.child.y) / 2
+                  
+                  const pathToChild = connection.parent.x === connection.child.x 
+                    ? `M ${connection.parent.x} ${connection.parent.y + 20} L ${connection.child.x} ${connection.child.y - 20}` // 直線
+                    : `M ${connection.parent.x} ${connection.parent.y + 20} L ${connection.parent.x} ${midY - cornerRadius} Q ${connection.parent.x} ${midY} ${connection.parent.x + (connection.child.x > connection.parent.x ? cornerRadius : -cornerRadius)} ${midY} L ${connection.child.x - (connection.child.x > connection.parent.x ? cornerRadius : -cornerRadius)} ${midY} Q ${connection.child.x} ${midY} ${connection.child.x} ${midY + cornerRadius} L ${connection.child.x} ${connection.child.y - 20}`
+                  
+                  return (
+                    <path
+                      key={`parent-child-${index}`}
+                      d={pathToChild}
+                      stroke="#6b7280"
+                      strokeWidth="2"
+                      fill="none"
+                      opacity="0.7"
+                    />
+                  )
+                })}
               </svg>
 
               {/* 人物ノード */}
@@ -741,15 +1276,21 @@ export default function FamilyTreeApp() {
                   }`}
                   style={{ left: person.x, top: person.y }}
                   onClick={() => setSelectedPerson(person)}
+                  onMouseDown={(e) => handleCardMouseDown(e, person)}
                 >
                   <Card
-                    className={`w-40 ${person.isUncertain ? "border-dashed border-yellow-400 bg-yellow-50" : "bg-white"} hover:shadow-lg transition-shadow`}
+                    className={`w-40 ${person.isUncertain ? "border-dashed border-yellow-400 bg-yellow-50" : 
+                      person.sex === "male" ? "bg-blue-50 border-blue-200" : 
+                      person.sex === "female" ? "bg-pink-50 border-pink-200" : "bg-white"} hover:shadow-lg transition-shadow`}
                   >
-                    <CardContent className="p-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-3 h-3 rounded-full bg-blue-400"></div>
-                        {person.isUncertain && <AlertCircle className="w-3 h-3 text-yellow-600" />}
-                      </div>
+                                          <CardContent className="p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className={`w-3 h-3 rounded-full ${
+                            person.sex === "male" ? "bg-blue-500" : 
+                            person.sex === "female" ? "bg-pink-500" : "bg-gray-400"
+                          }`}></div>
+                          {person.isUncertain && <AlertCircle className="w-3 h-3 text-yellow-600" />}
+                        </div>
                       <h4 className="font-medium text-sm text-gray-900 mb-1">{person.displayName}</h4>
                       <div className="text-xs text-gray-600 space-y-1">
                         {person.birth?.date && (
@@ -1059,11 +1600,53 @@ export default function FamilyTreeApp() {
 
                 <ScrollArea className="flex-1">
                   <div className="space-y-4 pr-4">
-                    <div>
-                      <Label htmlFor="name" className="text-sm font-medium text-gray-700">
-                        氏名
-                      </Label>
-                      <Input id="name" value={selectedPerson.displayName} className="mt-1" />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="surname" className="text-sm font-medium text-gray-700">
+                          姓
+                        </Label>
+                        <Input 
+                          id="surname" 
+                          value={selectedPerson.name.surname} 
+                          onChange={(e) => {
+                            const updatedFamilyMembers = familyData.family_members.map((person: any) => 
+                              person.id === selectedPerson.id 
+                                ? { ...person, name: { ...person.name, surname: e.target.value } }
+                                : person
+                            )
+                            setFamilyData({ ...familyData, family_members: updatedFamilyMembers })
+                            setSelectedPerson({ 
+                              ...selectedPerson, 
+                              name: { ...selectedPerson.name, surname: e.target.value },
+                              displayName: `${e.target.value} ${selectedPerson.name.given_name}`.trim()
+                            })
+                          }}
+                          className="mt-1" 
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="givenName" className="text-sm font-medium text-gray-700">
+                          名
+                        </Label>
+                        <Input 
+                          id="givenName" 
+                          value={selectedPerson.name.given_name} 
+                          onChange={(e) => {
+                            const updatedFamilyMembers = familyData.family_members.map((person: any) => 
+                              person.id === selectedPerson.id 
+                                ? { ...person, name: { ...person.name, given_name: e.target.value } }
+                                : person
+                            )
+                            setFamilyData({ ...familyData, family_members: updatedFamilyMembers })
+                            setSelectedPerson({ 
+                              ...selectedPerson, 
+                              name: { ...selectedPerson.name, given_name: e.target.value },
+                              displayName: `${selectedPerson.name.surname} ${e.target.value}`.trim()
+                            })
+                          }}
+                          className="mt-1" 
+                        />
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
@@ -1071,13 +1654,47 @@ export default function FamilyTreeApp() {
                         <Label htmlFor="birth" className="text-sm font-medium text-gray-700">
                           生年月日
                         </Label>
-                        <Input id="birth" value={selectedPerson.birth?.date || ""} className="mt-1" />
+                        <Input 
+                          id="birth" 
+                          type="date"
+                          value={selectedPerson.birth?.date || ""} 
+                          onChange={(e) => {
+                            const updatedFamilyMembers = familyData.family_members.map((person: any) => 
+                              person.id === selectedPerson.id 
+                                ? { ...person, birth: { ...person.birth, date: e.target.value } }
+                                : person
+                            )
+                            setFamilyData({ ...familyData, family_members: updatedFamilyMembers })
+                            setSelectedPerson({ 
+                              ...selectedPerson, 
+                              birth: { ...selectedPerson.birth, date: e.target.value }
+                            })
+                          }}
+                          className="mt-1" 
+                        />
                       </div>
                       <div>
                         <Label htmlFor="death" className="text-sm font-medium text-gray-700">
                           没年月日
                         </Label>
-                        <Input id="death" value={selectedPerson.death?.date || ""} className="mt-1" />
+                        <Input 
+                          id="death" 
+                          type="date"
+                          value={selectedPerson.death?.date || ""} 
+                          onChange={(e) => {
+                            const updatedFamilyMembers = familyData.family_members.map((person: any) => 
+                              person.id === selectedPerson.id 
+                                ? { ...person, death: { ...person.death, date: e.target.value } }
+                                : person
+                            )
+                            setFamilyData({ ...familyData, family_members: updatedFamilyMembers })
+                            setSelectedPerson({ 
+                              ...selectedPerson, 
+                              death: { ...selectedPerson.death, date: e.target.value }
+                            })
+                          }}
+                          className="mt-1" 
+                        />
                       </div>
                     </div>
 
@@ -1111,21 +1728,97 @@ export default function FamilyTreeApp() {
                       <Label className="text-sm font-medium text-gray-700">性別</Label>
                       <div className="flex gap-3 mt-2">
                         <label className="flex items-center gap-2">
-                          <input type="radio" name="gender" value="male" defaultChecked disabled className="text-blue-600" />
+                          <input 
+                            type="radio" 
+                            name={`gender-${selectedPerson.id}`}
+                            value="male" 
+                            checked={selectedPerson.sex === "male"}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                const updatedFamilyMembers = familyData.family_members.map((person: any) => 
+                                  person.id === selectedPerson.id 
+                                    ? { ...person, sex: "male" }
+                                    : person
+                                )
+                                setFamilyData({ ...familyData, family_members: updatedFamilyMembers })
+                                setSelectedPerson({ ...selectedPerson, sex: "male" })
+                              }
+                            }}
+                            className="text-blue-600" 
+                          />
                           <span className="text-sm">男性</span>
                         </label>
                         <label className="flex items-center gap-2">
-                          <input type="radio" name="gender" value="female" disabled className="text-pink-600" />
+                          <input 
+                            type="radio" 
+                            name={`gender-${selectedPerson.id}`}
+                            value="female" 
+                            checked={selectedPerson.sex === "female"}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                const updatedFamilyMembers = familyData.family_members.map((person: any) => 
+                                  person.id === selectedPerson.id 
+                                    ? { ...person, sex: "female" }
+                                    : person
+                                )
+                                setFamilyData({ ...familyData, family_members: updatedFamilyMembers })
+                                setSelectedPerson({ ...selectedPerson, sex: "female" })
+                              }
+                            }}
+                            className="text-pink-600" 
+                          />
                           <span className="text-sm">女性</span>
                         </label>
                       </div>
                     </div>
 
-                    <div>
-                      <Label htmlFor="address" className="text-sm font-medium text-gray-700">
-                        住所
-                      </Label>
-                      <Textarea id="address" value="" disabled placeholder="住所情報を入力..." className="mt-1" rows={3} />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="birthPlace" className="text-sm font-medium text-gray-700">
+                          出生地
+                        </Label>
+                        <Input 
+                          id="birthPlace" 
+                          value={selectedPerson.birth?.place || ""} 
+                          onChange={(e) => {
+                            const updatedFamilyMembers = familyData.family_members.map((person: any) => 
+                              person.id === selectedPerson.id 
+                                ? { ...person, birth: { date: person.birth?.date || "", place: e.target.value } }
+                                : person
+                            )
+                            setFamilyData({ ...familyData, family_members: updatedFamilyMembers })
+                            setSelectedPerson({ 
+                              ...selectedPerson, 
+                              birth: { date: selectedPerson.birth?.date || "", place: e.target.value }
+                            })
+                          }}
+                          placeholder="出生地を入力..." 
+                          className="mt-1" 
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="deathPlace" className="text-sm font-medium text-gray-700">
+                          没地
+                        </Label>
+                        <Input 
+                          id="deathPlace" 
+                          value={selectedPerson.death?.place || ""} 
+                          onChange={(e) => {
+                            const updatedFamilyMembers = familyData.family_members.map((person: any) => 
+                              person.id === selectedPerson.id 
+                                ? { ...person, death: { date: person.death?.date || "", place: e.target.value } }
+                                : person
+                            )
+                            setFamilyData({ ...familyData, family_members: updatedFamilyMembers })
+                            setSelectedPerson({ 
+                              ...selectedPerson, 
+                              death: { date: selectedPerson.death?.date || "", place: e.target.value }
+                            })
+                          }}
+                          placeholder="没地を入力..." 
+                          className="mt-1" 
+                        />
+                      </div>
                     </div>
 
                     <div>

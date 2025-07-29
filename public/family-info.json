@@ -3,6 +3,7 @@
       {
         "id": "mitsueda_kenjiro",
         "generation": 1,
+        "sex": "male",
         "name": { "surname": "光枝", "given_name": "兼次郎" },
         "spouse": { "name": "八代" },
         "children": [{ "name": "阿吹 軍一 (旧姓: 光枝)" }]
@@ -10,6 +11,7 @@
       {
         "id": "yashiro",
         "generation": 1,
+        "sex": "female",
         "name": { "surname": "", "given_name": "八代" },
         "spouse": { "name": "光枝 兼次郎" },
         "children": [{ "name": "阿吹 軍一 (旧姓: 光枝)" }]
@@ -17,6 +19,7 @@
       {
         "id": "abuki_risaburo",
         "generation": 1,
+        "sex": "male",
         "name": { "surname": "阿吹", "given_name": "利三郎" },
         "spouse": { "name": "美名" },
         "death": { "original_date": "明治35年6月", "date": "1902-06" },
@@ -28,6 +31,7 @@
       {
         "id": "nishina_mina",
         "generation": 1,
+        "sex": "female",
         "name": { "surname": "仁科", "given_name": "美名" },
         "birth": { "original_date": "安政元年3月15日", "date": "1854-04-12" },
         "father": "仁科 惣吉",
@@ -37,6 +41,7 @@
       {
         "id": "abuki_gunichi_1871",
         "generation": 2,
+        "sex": "male",
         "name": { "surname": "阿吹", "given_name": "軍一" },
         "birth": { "original_date": "明治4年6月9日", "date": "1871-07-26" },
         "death": { "original_date": "昭和44年1月6日", "date": "1969-01-06", "place": "福山市野上町" },
@@ -62,6 +67,7 @@
       {
         "id": "abuki_deki",
         "generation": 2,
+        "sex": "female",
         "name": { "surname": "阿吹", "given_name": "でき (きト)" },
         "adoptive_father": "阿吹 利三郎",
         "adoptive_mother": "美名",
@@ -71,6 +77,7 @@
       {
         "id": "endo_hanako_1895",
         "generation": 2,
+        "sex": "female",
         "name": { "surname": "遠藤", "given_name": "ハナコ" },
         "birth": { "original_date": "明治28年6月30日", "date": "1895-06-30" },
         "death": { "original_date": "昭和44年2月16日", "date": "1969-02-16", "place": "福山市野上町" },
@@ -81,6 +88,7 @@
       {
         "id": "abuki_ayano_1894",
         "generation": 3,
+        "sex": "female",
         "name": { "surname": "阿吹", "given_name": "アヤノ" },
         "birth": { "original_date": "明治27年3月", "date": "1894-03" },
         "father": "阿吹 軍一",
@@ -90,6 +98,7 @@
       {
         "id": "abuki_yoshinori_1914",
         "generation": 3,
+        "sex": "female",
         "name": { "surname": "阿吹", "given_name": "美則" },
         "birth": { "original_date": "大正3年", "date": "1914" },
         "father": "阿吹 軍一",
@@ -98,6 +107,7 @@
       {
         "id": "abuki_yoshiko_1919",
         "generation": 3,
+        "sex": "female",
         "name": { "surname": "阿吹", "given_name": "ヨシコ" },
         "birth": { "original_date": "大正8年4月13日", "date": "1919-04-13" },
         "father": "阿吹 軍一",
@@ -107,6 +117,7 @@
       {
         "id": "abuki_kozaburo_1921",
         "generation": 3,
+        "sex": "male",
         "name": { "surname": "阿吹", "given_name": "幸三郎" },
         "birth": { "original_date": "大正10年7月", "date": "1921-07" },
         "father": "阿吹 軍一",
@@ -115,6 +126,7 @@
       {
         "id": "abuki_shigeyoshi_1924",
         "generation": 3,
+        "sex": "male",
         "name": { "surname": "阿吹", "given_name": "繁好" },
         "birth": { "original_date": "大正13年", "date": "1924" },
         "death": { "original_date": "大正13年4月16日", "date": "1924-04-16" },
@@ -124,6 +136,7 @@
       {
         "id": "abuki_sasae_1926",
         "generation": 3,
+        "sex": "female",
         "name": { "surname": "阿吹", "given_name": "笹江" },
         "birth": { "original_date": "大正15年5月10日", "date": "1926-05-10" },
         "father": "阿吹 軍一",
@@ -133,6 +146,7 @@
       {
         "id": "abuki_shozo_1928",
         "generation": 3,
+        "sex": "male",
         "name": { "surname": "阿吹", "given_name": "昭三" },
         "birth": { "original_date": "昭和3年9月6日", "date": "1928-09-06" },
         "father": "阿吹 軍一",
@@ -142,6 +156,7 @@
       {
         "id": "abuki_shuichiro_1907",
         "generation": 3,
+        "sex": "male",
         "name": { "surname": "阿吹", "given_name": "主一郎" },
         "birth": { "original_date": "明治40年3月14日", "date": "1907-03-14", "place": "岡山県浅口郡大島村" },
         "death": { "original_date": "昭和58年2月17日", "date": "1983-02-17", "place": "福山市" },
@@ -157,6 +172,7 @@
       {
         "id": "ogawa_hanako_1908",
         "generation": 3,
+        "sex": "female",
         "name": { "surname": "小川", "given_name": "ハナ子" },
         "birth": { "original_date": "明治41年8月25日", "date": "1908-08-25" },
         "death": { "original_date": "昭和63年6月10日", "date": "1988-06-10", "place": "福山市" },
@@ -168,6 +184,7 @@
       {
         "id": "abuki_iwao_1930",
         "generation": 4,
+        "sex": "male",
         "name": { "surname": "阿吹", "given_name": "岩夫" },
         "birth": { "original_date": "昭和5年4月3日", "date": "1930-04-03" },
         "father": "阿吹 主一郎",
@@ -177,6 +194,7 @@
       {
         "id": "abuki_kinue_1934",
         "generation": 4,
+        "sex": "female",
         "name": { "surname": "阿吹", "given_name": "絹枝" },
         "birth": { "original_date": "昭和9年11月27日", "date": "1934-11-27" },
         "death": { "original_date": "昭和11年", "date": "1936" },
@@ -186,6 +204,7 @@
       {
         "id": "abuki_koji_1936",
         "generation": 4,
+        "sex": "male",
         "name": { "surname": "阿吹", "given_name": "耕二" },
         "birth": { "original_date": "昭和11年9月8日", "date": "1936-09-08" },
         "father": "阿吹 主一郎",
@@ -195,6 +214,7 @@
       {
         "id": "abuki_katsuji_1938",
         "generation": 4,
+        "sex": "male",
         "name": { "surname": "阿吹", "given_name": "勝治" },
         "birth": { "original_date": "昭和13年10月31日", "date": "1938-10-31" },
         "father": "阿吹 主一郎",
@@ -204,6 +224,7 @@
       {
         "id": "abuki_seigo_1942",
         "generation": 4,
+        "sex": "male",
         "name": { "surname": "阿吹", "given_name": "征吾" },
         "birth": { "original_date": "昭和17年", "date": "1942" },
         "father": "阿吹 主一郎",
@@ -212,6 +233,7 @@
       {
         "id": "abuki_chieko_1947",
         "generation": 4,
+        "sex": "female",
         "name": { "surname": "阿吹", "given_name": "千枝子" },
         "birth": { "original_date": "昭和22年1月9日", "date": "1947-01-09" },
         "father": "阿吹 主一郎",
@@ -221,6 +243,7 @@
       {
         "id": "abuki_teruo_1932",
         "generation": 4,
+        "sex": "male",
         "name": { "surname": "阿吹", "given_name": "輝男" },
         "birth": { "original_date": "昭和7年6月19日", "date": "1932-06-19", "place": "広島県福山市" },
         "death": { "original_date": "令和2年12月3日", "date": "2020-12-03", "place": "広島県福山市" },
@@ -240,6 +263,7 @@
       {
         "id": "terada_yoshiko",
         "generation": 4,
+        "sex": "female",
         "name": { "surname": "寺田", "given_name": "ヨシコ" },
         "father": "寺田 豐吉",
         "spouse": { "name": "阿吹 輝男" }
@@ -247,6 +271,7 @@
       {
         "id": "abuki_damako_1951",
         "generation": 5,
+        "sex": "female",
         "name": { "surname": "阿吹", "given_name": "ダマ子" },
         "birth": { "original_date": "昭和26年8月5日", "date": "1951-08-05" },
         "death": { "original_date": "昭和26年8月", "date": "1951-08" },
@@ -256,6 +281,7 @@
       {
         "id": "abuki_shinji_1960",
         "generation": 5,
+        "sex": "male",
         "name": { "surname": "阿吹", "given_name": "伸二" },
         "birth": { "original_date": "昭和35年4月16日", "date": "1960-04-16" },
         "father": "阿吹 輝男",
@@ -265,6 +291,7 @@
       {
         "id": "mitsui_eiko_1932",
         "generation": 4,
+        "sex": "female",
         "name": { "surname": "三井", "given_name": "榮子" },
         "birth": { "original_date": "昭和7年10月28日", "date": "1932-10-28", "place": "広島県沼隈郡高須村" },
         "father": "三井 静一",
@@ -275,6 +302,7 @@
       {
         "id": "abuki_chizuko_1952",
         "generation": 5,
+        "sex": "female",
         "name": { "surname": "阿吹", "given_name": "千鶴子" },
         "birth": { "original_date": "昭和27年8月9日", "date": "1952-08-09" },
         "death": { "original_date": "平成15年5月11日", "date": "2003-05-11", "place": "三原市" },
@@ -287,6 +315,7 @@
       {
         "id": "abuki_masahiro_1957",
         "generation": 5,
+        "sex": "male",
         "name": { "surname": "阿吹", "given_name": "正宏" },
         "birth": { "original_date": "昭和32年9月20日", "date": "1957-09-20", "place": "福山市" },
         "father": "阿吹 輝男",
@@ -297,6 +326,7 @@
       {
         "id": "abuki_kanako_1986",
         "generation": 6,
+        "sex": "female",
         "name": { "surname": "阿吹", "given_name": "加奈子" },
         "birth": { "original_date": "昭和61年9月20日", "date": "1986-09-20" },
         "father": "阿吹 正宏",
@@ -305,6 +335,7 @@
       {
         "id": "ogasawara_kayoko_1959",
         "generation": 5,
+        "sex": "female",
         "name": { "surname": "小笠原", "given_name": "加代子" },
         "birth": { "original_date": "昭和34年9月6日", "date": "1959-09-06", "place": "三原市" },
         "father": "小笠原 利甲",
@@ -314,6 +345,7 @@
       {
         "id": "abuki_narutoshi_1990",
         "generation": 6,
+        "sex": "male",
         "name": { "surname": "阿吹", "given_name": "成駿" },
         "birth": { "original_date": "平成2年5月17日", "date": "1990-05-17", "place": "広島県福山市" },
         "father": "阿吹 正宏",
@@ -324,6 +356,7 @@
       {
         "id": "inoue_mayumi_1990",
         "generation": 6,
+        "sex": "female",
         "name": { "surname": "井上", "given_name": "麻裕美" },
         "birth": { "original_date": "平成2年7月18日", "date": "1990-07-18", "place": "兵庫県小野市" },
         "father": "井上 邦美",
@@ -333,6 +366,7 @@
       {
         "id": "abuki_sota_2016",
         "generation": 7,
+        "sex": "male",
         "name": { "surname": "阿吹", "given_name": "奏汰" },
         "birth": { "original_date": "平成28年7月22日", "date": "2016-07-22", "place": "兵庫県小野市" },
         "father": "阿吹 成駿",
@@ -341,6 +375,7 @@
       {
         "id": "abuki_minami_2018",
         "generation": 7,
+        "sex": "female",
         "name": { "surname": "阿吹", "given_name": "美波" },
         "birth": { "original_date": "平成30年8月1日", "date": "2018-08-01", "place": "兵庫県小野市" },
         "father": "阿吹 成駿",
@@ -349,6 +384,7 @@
       {
         "id": "abuki_otoha_2022",
         "generation": 7,
+        "sex": "female",
         "name": { "surname": "阿吹", "given_name": "音波" },
         "birth": { "original_date": "令和4年8月19日", "date": "2022-08-19", "place": "広島県福山市" },
         "father": "阿吹 成駿",
@@ -356,4 +392,3 @@
       }
     ]
   }
-  
