@@ -29,11 +29,15 @@ interface UseLayoutCalculationReturn {
   
   // 操作
   updatePersonPosition: (id: string, x: number, y: number) => void
+  updatePersonGeneration: (id: string, newGeneration: number) => void
   resetLayout: () => void
   autoLayout: () => void
   
   // ユーティリティ
   getBounds: () => { minX: number, maxX: number, minY: number, maxY: number }
+  getGenerationFromY: (y: number) => number
+  snapToGeneration: (y: number) => number
+  getGenerationY: (generation: number) => number
 }
 
 export function useLayoutCalculation(
@@ -43,31 +47,85 @@ export function useLayoutCalculation(
   
   // 手動調整された位置を保存
   const [manualPositions, setManualPositions] = useState<Record<string, { x: number, y: number }>>({})
+  // 世代変更を保存
+  const [generationChanges, setGenerationChanges] = useState<Record<string, number>>({})
+
+  // 世代のY座標を計算
+  const getGenerationY = useCallback((generation: number) => {
+    return LAYOUT_CONFIG.initialY + (generation - 1) * LAYOUT_CONFIG.generationSpacing
+  }, [])
+
+  // Y座標から世代を判定（スナップ範囲を考慮）
+  const getGenerationFromY = useCallback((y: number) => {
+    const snapThreshold = LAYOUT_CONFIG.generationSpacing * 0.4 // 40%の範囲でスナップ
+    
+    // 最も近い世代を見つける
+    let closestGeneration = 1
+    let minDistance = Infinity
+    
+    // 現在存在する世代の範囲を確認
+    const existingGenerations = Array.from(new Set(persons.map(p => 
+      generationChanges[p.id] ?? p.generation
+    ))).sort((a, b) => a - b)
+    
+    const minGen = Math.min(...existingGenerations) - 1
+    const maxGen = Math.max(...existingGenerations) + 1
+    
+    for (let gen = minGen; gen <= maxGen; gen++) {
+      const genY = getGenerationY(gen)
+      const distance = Math.abs(y - genY)
+      
+      if (distance < minDistance && distance <= snapThreshold) {
+        minDistance = distance
+        closestGeneration = gen
+      }
+    }
+    
+    return closestGeneration
+  }, [persons, generationChanges, getGenerationY])
+
+  // Y座標を最も近い世代の高さにスナップ
+  const snapToGeneration = useCallback((y: number) => {
+    const targetGeneration = getGenerationFromY(y)
+    return getGenerationY(targetGeneration)
+  }, [getGenerationFromY, getGenerationY])
 
   // 自動レイアウト計算
   const calculateAutoLayout = useCallback((inputPersons: ProcessedPerson[], inputFamilies: FamilyGroup[]) => {
     if (inputPersons.length === 0) return []
 
-    const layoutPersons = [...inputPersons]
+    // 世代変更を適用した人物データを作成
+    const personsWithUpdatedGenerations = inputPersons.map(person => ({
+      ...person,
+      generation: generationChanges[person.id] ?? person.generation
+    }))
+
+    const layoutPersons = [...personsWithUpdatedGenerations]
     const generationGroups = groupByGeneration(layoutPersons)
     
     let currentX = LAYOUT_CONFIG.initialX
     
     // 世代順にレイアウト
     Array.from(generationGroups.keys()).sort((a, b) => a - b).forEach(generation => {
-      const generationY = LAYOUT_CONFIG.initialY + (generation - 1) * LAYOUT_CONFIG.generationSpacing
+      const generationY = getGenerationY(generation)
       let generationX = currentX
 
       // この世代の家族単位を処理
       const generationFamilies = inputFamilies.filter(family => 
-        family.parents.some(parent => parent.generation === generation)
+        family.parents.some(parent => {
+          const parentGeneration = generationChanges[parent.id] ?? parent.generation
+          return parentGeneration === generation
+        })
       )
 
       // 処理済みの人物をトラック
       const processedPersonIds = new Set<string>()
 
       generationFamilies.forEach(family => {
-        const generationParents = family.parents.filter(p => p.generation === generation)
+        const generationParents = family.parents.filter(p => {
+          const parentGeneration = generationChanges[p.id] ?? p.generation
+          return parentGeneration === generation
+        })
         
         if (generationParents.length === 1) {
           // 単親家族
@@ -137,7 +195,7 @@ export function useLayoutCalculation(
     })
 
     return layoutPersons
-  }, [manualPositions])
+  }, [manualPositions, generationChanges, getGenerationY])
 
   // レイアウトされた人物データ
   const layoutPersons = useMemo(() => {
@@ -250,15 +308,25 @@ export function useLayoutCalculation(
     }))
   }, [])
 
+  // 人物の世代変更
+  const updatePersonGeneration = useCallback((id: string, newGeneration: number) => {
+    setGenerationChanges(prev => ({
+      ...prev,
+      [id]: newGeneration
+    }))
+  }, [])
+
   // レイアウトリセット
   const resetLayout = useCallback(() => {
     setManualPositions({})
+    setGenerationChanges({})
   }, [])
 
   // オートレイアウト実行
   const autoLayout = useCallback(() => {
     // 手動位置をクリアして自動レイアウトを適用
     setManualPositions({})
+    setGenerationChanges({})
   }, [])
 
   // 境界の計算
@@ -284,8 +352,12 @@ export function useLayoutCalculation(
     parentChildLines,
     siblingLines,
     updatePersonPosition,
+    updatePersonGeneration,
     resetLayout,
     autoLayout,
-    getBounds
+    getBounds,
+    getGenerationFromY,
+    snapToGeneration,
+    getGenerationY
   }
 } 

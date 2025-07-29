@@ -29,9 +29,13 @@ export function FamilyTree({
     parentChildLines,
     siblingLines,
     updatePersonPosition,
+    updatePersonGeneration,
     resetLayout,
     autoLayout,
-    getBounds
+    getBounds,
+    getGenerationFromY,
+    snapToGeneration,
+    getGenerationY
   } = useLayoutCalculation(persons, families)
 
   // ズーム・パン状態
@@ -149,17 +153,34 @@ export function FamilyTree({
     
     const rect = canvasRef.current.getBoundingClientRect()
     const newX = (e.clientX - rect.left - panX) / zoom
-    const newY = (e.clientY - rect.top - panY) / zoom
+    const rawY = (e.clientY - rect.top - panY) / zoom
     
-    updatePersonPosition(draggedPerson.id, newX, newY)
-    onPersonPositionUpdate?.(draggedPerson.id, newX, newY)
-  }, [isDragging, draggedPerson, dragOffset, zoom, panX, panY, updatePersonPosition, onPersonPositionUpdate])
+    // Y座標を世代の高さにスナップ
+    const snappedY = snapToGeneration(rawY)
+    
+    updatePersonPosition(draggedPerson.id, newX, snappedY)
+    onPersonPositionUpdate?.(draggedPerson.id, newX, snappedY)
+  }, [isDragging, draggedPerson, dragOffset, zoom, panX, panY, updatePersonPosition, onPersonPositionUpdate, snapToGeneration])
 
   const handlePersonDragEnd = useCallback(() => {
+    if (draggedPerson) {
+      // ドラッグされた人物の現在の位置から世代を判定
+      const currentPosition = layoutPersons.find(p => p.id === draggedPerson.id)
+      if (currentPosition) {
+        const newGeneration = getGenerationFromY(currentPosition.y)
+        const originalGeneration = draggedPerson.generation
+        
+        // 世代が変更された場合、世代を更新
+        if (newGeneration !== originalGeneration) {
+          updatePersonGeneration(draggedPerson.id, newGeneration)
+        }
+      }
+    }
+    
     setIsDragging(false)
     setDraggedPerson(null)
     setDragOffset({ x: 0, y: 0 })
-  }, [])
+  }, [draggedPerson, layoutPersons, getGenerationFromY, updatePersonGeneration])
 
   // イベントリスナー
   useEffect(() => {
@@ -270,6 +291,41 @@ export function FamilyTree({
             transition: isPanning ? 'none' : `transform ${UI_CONFIG.transitionDuration} ease-out`
           }}
         >
+          {/* 世代ガイドライン（ドラッグ中のみ表示） */}
+          {isDragging && (
+            <div className="absolute inset-0 pointer-events-none">
+              {generations.map(generation => {
+                const y = getGenerationY(generation)
+                const snapThreshold = LAYOUT_CONFIG.generationSpacing * 0.4
+                
+                return (
+                  <div key={generation}>
+                    {/* メインライン */}
+                    <div
+                      className="absolute left-0 right-0 border-t-2 border-blue-300 opacity-50"
+                      style={{ top: y }}
+                    />
+                    {/* スナップ範囲 */}
+                    <div
+                      className="absolute left-0 right-0 bg-blue-100 opacity-20"
+                      style={{ 
+                        top: y - snapThreshold, 
+                        height: snapThreshold * 2 
+                      }}
+                    />
+                    {/* 世代ラベル */}
+                    <div
+                      className="absolute left-4 bg-blue-500 text-white px-2 py-1 rounded text-sm font-medium"
+                      style={{ top: y - 12 }}
+                    >
+                      第{generation}世代
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
           {/* 関係線 */}
           <FamilyTreeLines
             marriageLines={marriageLines}
