@@ -125,13 +125,6 @@ export function PersonNode({
               </div>
             )}
           </div>
-
-          {/* 世代情報（デバッグ用、本番では非表示にできる） */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="mt-1 text-xs text-gray-400">
-              第{person.generation}世代
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>

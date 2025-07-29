@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -16,6 +16,8 @@ import {
   Edit3,
   Plus,
   Trash2,
+  Undo,
+  Redo,
 } from "lucide-react"
 
 // 新しいコンポーネントとフックをインポート
@@ -53,6 +55,10 @@ export default function FamilyTreeApp() {
     addFamily,
     updateFamily,
     deleteFamily,
+    canUndo,
+    canRedo,
+    undo,
+    redo,
     refreshData
   } = useFamilyData()
 
@@ -66,6 +72,31 @@ export default function FamilyTreeApp() {
   const [isPersonEditOpen, setIsPersonEditOpen] = useState(false)
   const [isRelationshipEditOpen, setIsRelationshipEditOpen] = useState(false)
   const [isAddPersonOpen, setIsAddPersonOpen] = useState(false)
+
+  // キーボードショートカット
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Command+Z (Mac) または Ctrl+Z (Windows/Linux) でアンドゥ
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        if (canUndo) {
+          undo()
+        }
+      }
+      
+      // Command+Shift+Z (Mac) または Ctrl+Y (Windows/Linux) でリドゥ
+      if (((e.metaKey || e.ctrlKey) && e.key === 'z' && e.shiftKey) || 
+          ((e.ctrlKey) && e.key === 'y')) {
+        e.preventDefault()
+        if (canRedo) {
+          redo()
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [canUndo, canRedo, undo, redo])
 
   // 人物選択ハンドラー
   const handlePersonSelect = (person: ProcessedPerson) => {
@@ -149,6 +180,28 @@ export default function FamilyTreeApp() {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">家系図ジェネレーター</h1>
           <div className="flex items-center gap-3">
+            {/* アンドゥ・リドゥボタン */}
+            <div className="flex items-center gap-1 border-r border-gray-200 pr-3 mr-3">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={undo}
+                disabled={!canUndo}
+                title="元に戻す (Cmd+Z)"
+              >
+                <Undo className="w-4 h-4" />
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={redo}
+                disabled={!canRedo}
+                title="やり直し (Cmd+Shift+Z)"
+              >
+                <Redo className="w-4 h-4" />
+              </Button>
+            </div>
+            
             <Button variant="outline" size="sm">
               <Save className="w-4 h-4 mr-2" />
               保存

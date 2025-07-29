@@ -253,32 +253,6 @@ export function FamilyTree({
         </div>
       </div>
 
-      {/* 世代ラベル（固定位置） */}
-      {generations.length > 0 && (
-        <div className="absolute left-4 top-0 bottom-0 z-20 pointer-events-none">
-          {generations.map((generation) => {
-            const generationY = LAYOUT_CONFIG.initialY + (generation - 1) * LAYOUT_CONFIG.generationSpacing;
-            const screenY = generationY * zoom + panY;
-            
-            return (
-              <div
-                key={`generation-label-${generation}`}
-                className="absolute bg-white px-3 py-1 rounded-full shadow-md border pointer-events-auto"
-                style={{
-                  top: `${screenY - UI_CONFIG.generationLabelOffset}px`,
-                  left: '0px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                  backdropFilter: 'blur(4px)',
-                  zIndex: 30
-                }}
-              >
-                <span className="text-sm font-medium text-gray-600">第{generation}世代</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
       {/* 家系図キャンバス */}
       <div 
         ref={canvasRef}
@@ -296,24 +270,6 @@ export function FamilyTree({
             transition: isPanning ? 'none' : `transform ${UI_CONFIG.transitionDuration} ease-out`
           }}
         >
-          {/* 世代区切り線 */}
-          <div className="absolute inset-0">
-            {generations.map((generation) => {
-              const generationY = LAYOUT_CONFIG.initialY + (generation - 1) * LAYOUT_CONFIG.generationSpacing;
-              
-              return (
-                <div 
-                  key={`generation-line-${generation}`}
-                  className="absolute left-0 h-px bg-gray-300 opacity-50"
-                  style={{ 
-                    top: `${generationY}px`,
-                    width: '2000px'
-                  }}
-                />
-              );
-            })}
-          </div>
-
           {/* 関係線 */}
           <FamilyTreeLines
             marriageLines={marriageLines}
