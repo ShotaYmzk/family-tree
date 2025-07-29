@@ -114,216 +114,21 @@ export default function FamilyTreeApp() {
   // 編集機能用のstate
   const [isAddPersonDialogOpen, setIsAddPersonDialogOpen] = useState(false)
   const [isAddRelationshipDialogOpen, setIsAddRelationshipDialogOpen] = useState(false)
-  
-  const [familyData, setFamilyData] = useState<any>({
-    family_members: [
-      {
-        id: "mitsueda_kenjiro",
-        name: {
-          surname: "光枝",
-          given_name: "兼次郎",
-        },
-        spouse: {
-          name: "八代",
-        },
-        children: [
-          {
-            name: "阿吹 軍一 (旧姓: 光枝)",
-          },
-        ],
-      },
-      {
-        id: "yashiro",
-        name: {
-          surname: "",
-          given_name: "八代",
-        },
-        spouse: {
-          name: "光枝 兼次郎",
-        },
-        children: [
-          {
-            name: "阿吹 軍一 (旧姓: 光枝)",
-          },
-        ],
-      },
-      {
-        id: "abuki_risaburo",
-        name: {
-          surname: "阿吹",
-          given_name: "利三郎",
-        },
-        spouse: {
-          name: "美名",
-        },
-        death: {
-          date: "1902-06",
-        },
-        adoptive_children: [
-          {
-            name: "でき (きト)",
-            type: "養女",
-          },
-          {
-            name: "阿吹 軍一",
-            type: "婿養子",
-          },
-        ],
-      },
-      {
-        id: "nishina_mina",
-        name: {
-          surname: "仁科",
-          given_name: "美名",
-        },
-        birth: {
-          date: "1854-04-12",
-        },
-        father: "仁科 惣吉",
-        spouse: {
-          name: "阿吹 利三郎",
-        },
-      },
-      {
-        id: "abuki_gunichi_1871",
-        name: {
-          surname: "阿吹",
-          given_name: "軍一",
-        },
-        birth: {
-          date: "1871-07-26",
-        },
-        death: {
-          date: "1969-01-06",
-          place: "福山市野上町",
-        },
-        father: "光枝 兼次郎",
-        mother: "八代",
-        adoptive_father: "阿吹 利三郎",
-        adoptive_mother: "美名",
-        spouses: [
-          {
-            name: "でき (きト)",
-            marriage_date: "1904-01-31",
-          },
-          {
-            name: "遠藤 ハナコ",
-            marriage_date: "1918-12-14",
-          },
-        ],
-        children: [
-          { name: "主一郎", mother: "でき" },
-          { name: "アヤノ", mother: "でき" },
-          { name: "美則", mother: "ハナコ" },
-          { name: "ヨシコ", mother: "ハナコ" },
-          { name: "幸三郎", mother: "ハナコ" },
-          { name: "繁好", mother: "ハナコ" },
-          { name: "笹江", mother: "ハナコ" },
-          { name: "昭三", mother: "ハナコ" },
-        ],
-      },
-      {
-        id: "abuki_shuichiro_1907",
-        name: {
-          surname: "阿吹",
-          given_name: "主一郎",
-        },
-        birth: {
-          date: "1907-03-14",
-          place: "岡山県浅口郡大島村",
-        },
-        death: {
-          date: "1983-02-17",
-          place: "福山市",
-        },
-        father: "阿吹 軍一",
-        mother: "でき (きト)",
-        spouse: {
-          name: "小川 ハナ子",
-          marriage_date: "1930-01-11",
-        },
-        children: [
-          { name: "岩夫" },
-          { name: "輝男" },
-          { name: "絹枝" },
-          { name: "耕二" },
-          { name: "勝治" },
-          { name: "征吾" },
-          { name: "千枝子" },
-        ],
-      },
-      {
-        id: "abuki_teruo_1932",
-        name: {
-          surname: "阿吹",
-          given_name: "輝男",
-        },
-        birth: {
-          date: "1932-06-19",
-          place: "広島県福山市",
-        },
-        death: {
-          date: "2020-12-03",
-          place: "広島県福山市",
-        },
-        father: "阿吹 主一郎",
-        mother: "ハナ子 (小川)",
-        spouses: [
-          {
-            name: "寺田 ヨシコ",
-            marriage_date: "1951-08-08",
-            divorce_date: "1956-06-15",
-          },
-          {
-            name: "三井 榮子",
-            marriage_date: "1957-02-25",
-          },
-        ],
-        children: [
-          { name: "ダマ子", mother: "ヨシコ" },
-          { name: "千鶴子", mother: "ヨシコ" },
-          { name: "正宏", mother: "榮子" },
-          { name: "伸二", mother: "榮子" },
-        ],
-      },
-      {
-        id: "abuki_masahiro_1957",
-        name: {
-          surname: "阿吹",
-          given_name: "正宏",
-        },
-        birth: {
-          date: "1957-09-20",
-          place: "福山市",
-        },
-        father: "阿吹 輝男",
-        mother: "榮子 (三井)",
-        spouse: {
-          name: "小笠原 加代子",
-          marriage_date: "1984-01-22",
-        },
-        children: [{ name: "成駿" }, { name: "加奈子" }],
-      },
-      {
-        id: "abuki_narutoshi_1990",
-        name: {
-          surname: "阿吹",
-          given_name: "成駿",
-        },
-        birth: {
-          date: "1990-05-17",
-          place: "広島県福山市",
-        },
-        father: "阿吹 正宏",
-        mother: "加代子 (小笠原)",
-        spouse: {
-          name: "井上 麻裕美",
-          marriage_date: "2015-04-05",
-        },
-        children: [{ name: "奏汰" }, { name: "美波" }, { name: "音波" }],
-      },
-    ],
-  })
+  const [familyData, setFamilyData] = useState<any>({ family_members: [] })
+
+  // Load family data from JSON file
+  useEffect(() => {
+    const loadFamilyData = async () => {
+      try {
+        const response = await fetch('/family-info.json')
+        const data = await response.json()
+        setFamilyData(data)
+      } catch (error) {
+        console.error('Failed to load family data:', error)
+      }
+    }
+    loadFamilyData()
+  }, [])
 
   // 新しい人物追加フォーム用のstate
   const [newPersonForm, setNewPersonForm] = useState({
@@ -355,54 +160,129 @@ export default function FamilyTreeApp() {
 
   // 家系図データを処理する関数
   const processedPersons = useMemo(() => {
-    const persons: ProcessedPerson[] = []
-    const generationMap = new Map<string, number>()
-
-    // 世代を計算する再帰関数
-    const calculateGeneration = (personId: string, visited = new Set<string>()): number => {
-      if (visited.has(personId)) return 0
-      visited.add(personId)
-
-      if (generationMap.has(personId)) {
-        return generationMap.get(personId)!
-      }
-
-      const person = familyData.family_members.find((p: any) => p.id === personId)
-      if (!person) return 0
-
-      let generation = 0
-      if (person.father || person.mother) {
-        const fatherGen = person.father ? calculateGeneration(person.father, visited) : 0
-        const motherGen = person.mother ? calculateGeneration(person.mother, visited) : 0
-        generation = Math.max(fatherGen, motherGen) + 1
-      }
-
-      generationMap.set(personId, generation)
-      return generation
+    if (!familyData.family_members || familyData.family_members.length === 0) {
+      return []
     }
 
-    // 各人物の世代を計算
+    const persons: ProcessedPerson[] = []
+    
+    // generationごとに人物を分類
+    const generationGroups = new Map<number, any[]>()
     familyData.family_members.forEach((person: any) => {
-      calculateGeneration(person.id)
+      const generation = person.generation || 1
+      if (!generationGroups.has(generation)) {
+        generationGroups.set(generation, [])
+      }
+      generationGroups.get(generation)!.push(person)
     })
 
-    // ProcessedPersonオブジェクトを作成
-    familyData.family_members.forEach((person: any, index: number) => {
-      const generation = generationMap.get(person.id) || 0
-      const displayName = `${person.name.surname} ${person.name.given_name}`
+    // 各世代の人物を配置
+    generationGroups.forEach((people, generation) => {
+      people.forEach((person: any, index: number) => {
+        const displayName = `${person.name.surname} ${person.name.given_name}`.trim()
+        const spacing = 180
+        const baseX = 100 + (spacing * index)
+        const baseY = 80 + (generation - 1) * 180
 
-      persons.push({
-        ...person,
-        displayName,
-        generation,
-        x: 200 + (index % 5) * 200,
-        y: 100 + generation * 150,
-        isUncertain: false, // 固定値に変更してHydration errorを回避
+        persons.push({
+          ...person,
+          displayName,
+          generation,
+          x: baseX,
+          y: baseY,
+          isUncertain: false,
+        })
       })
     })
 
     return persons
   }, [familyData.family_members])
+
+  // 結婚関係を探す関数
+  const findMarriageConnections = useMemo(() => {
+    const connections: Array<{person1: ProcessedPerson, person2: ProcessedPerson, isMarried: boolean}> = []
+    
+    processedPersons.forEach(person1 => {
+      // spouse フィールドがある場合
+      if (person1.spouse) {
+        const spouseName = person1.spouse.name
+        const person2 = processedPersons.find(p => 
+          `${p.name.surname} ${p.name.given_name}`.trim() === spouseName.trim()
+        )
+        if (person2) {
+          // 既に追加されていないかチェック
+          const exists = connections.some(conn => 
+            (conn.person1.id === person1.id && conn.person2.id === person2.id) ||
+            (conn.person1.id === person2.id && conn.person2.id === person1.id)
+          )
+          if (!exists) {
+            connections.push({person1, person2, isMarried: true})
+          }
+        }
+      }
+
+      // spouses 配列がある場合
+      if (person1.spouses && person1.spouses.length > 0) {
+        person1.spouses.forEach((spouse: any) => {
+          const person2 = processedPersons.find(p => 
+            `${p.name.surname} ${p.name.given_name}`.trim() === spouse.name.trim()
+          )
+          if (person2) {
+            const exists = connections.some(conn => 
+              (conn.person1.id === person1.id && conn.person2.id === person2.id) ||
+              (conn.person1.id === person2.id && conn.person2.id === person1.id)
+            )
+            if (!exists) {
+              connections.push({person1, person2, isMarried: true})
+            }
+          }
+        })
+      }
+    })
+
+    return connections
+  }, [processedPersons])
+
+  // 親子関係を探す関数
+  const findParentChildConnections = useMemo(() => {
+    const connections: Array<{parent: ProcessedPerson, child: ProcessedPerson}> = []
+    
+    processedPersons.forEach(person => {
+      // father関係
+      if (person.father) {
+        const parent = processedPersons.find(p => p.id === person.father)
+        if (parent) {
+          connections.push({parent, child: person})
+        }
+      }
+
+      // mother関係  
+      if (person.mother) {
+        const parent = processedPersons.find(p => p.id === person.mother)
+        if (parent) {
+          connections.push({parent, child: person})
+        }
+      }
+
+      // adoptive_father関係
+      if (person.adoptive_father) {
+        const parent = processedPersons.find(p => p.id === person.adoptive_father)
+        if (parent) {
+          connections.push({parent, child: person})
+        }
+      }
+
+      // adoptive_mother関係
+      if (person.adoptive_mother) {
+        const parent = processedPersons.find(p => p.id === person.adoptive_mother)
+        if (parent) {
+          connections.push({parent, child: person})
+        }
+      }
+    })
+
+    return connections
+  }, [processedPersons])
 
   // リサイズ機能
   const handleMouseDown = useCallback((side: "left" | "right") => {
@@ -790,16 +670,19 @@ export default function FamilyTreeApp() {
           </div>
 
           {/* 世代ラベル */}
-          <div className="absolute left-4 top-20 z-10 space-y-16">
-            <div className="bg-white px-3 py-1 rounded-full shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">第1世代</span>
-            </div>
-            <div className="bg-white px-3 py-1 rounded-full shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">第2世代</span>
-            </div>
-            <div className="bg-white px-3 py-1 rounded-full shadow-sm border">
-              <span className="text-sm font-medium text-gray-600">第3世代</span>
-            </div>
+          <div className="absolute left-4 top-20 z-10">
+            {Array.from(new Set(processedPersons.map(p => p.generation))).sort().map((generation, index) => (
+              <div 
+                key={generation}
+                className="bg-white px-3 py-1 rounded-full shadow-sm border mb-4"
+                style={{ 
+                  position: 'absolute',
+                  top: `${60 + (generation - 1) * 180}px`
+                }}
+              >
+                <span className="text-sm font-medium text-gray-600">第{generation}世代</span>
+              </div>
+            ))}
           </div>
 
           {/* 家系図キャンバス */}
@@ -807,20 +690,46 @@ export default function FamilyTreeApp() {
             <div className="relative min-w-[800px] min-h-[600px]">
               {/* 世代区切り線 */}
               <div className="absolute inset-0">
-                <div className="absolute top-16 left-0 right-0 h-px bg-gray-300"></div>
-                <div className="absolute top-32 left-0 right-0 h-px bg-gray-300"></div>
-                <div className="absolute top-48 left-0 right-0 h-px bg-gray-300"></div>
+                {Array.from(new Set(processedPersons.map(p => p.generation))).sort().map((generation) => (
+                  <div 
+                    key={`line-${generation}`}
+                    className="absolute left-0 right-0 h-px bg-gray-300 opacity-50"
+                    style={{ 
+                      top: `${60 + (generation - 1) * 180}px`
+                    }}
+                  ></div>
+                ))}
               </div>
 
               {/* 関係線 */}
               <svg className="absolute inset-0 w-full h-full pointer-events-none">
-                {/* 夫婦関係線 */}
-                <line x1="200" y1="100" x2="350" y2="100" stroke="#6b7280" strokeWidth="2" />
-                <line x1="275" y1="200" x2="425" y2="200" stroke="#6b7280" strokeWidth="2" />
+                {/* 結婚関係線 (太線) */}
+                {findMarriageConnections.map((connection, index) => (
+                  <line
+                    key={`marriage-${index}`}
+                    x1={connection.person1.x}
+                    y1={connection.person1.y}
+                    x2={connection.person2.x}
+                    y2={connection.person2.y}
+                    stroke="#dc2626"
+                    strokeWidth="3"
+                    opacity="0.8"
+                  />
+                ))}
 
                 {/* 親子関係線 */}
-                <line x1="275" y1="100" x2="275" y2="200" stroke="#6b7280" strokeWidth="2" />
-                <line x1="350" y1="200" x2="350" y2="300" stroke="#6b7280" strokeWidth="2" />
+                {findParentChildConnections.map((connection, index) => (
+                  <line
+                    key={`parent-child-${index}`}
+                    x1={connection.parent.x}
+                    y1={connection.parent.y + 20}
+                    x2={connection.child.x}
+                    y2={connection.child.y - 20}
+                    stroke="#6b7280"
+                    strokeWidth="2"
+                    opacity="0.7"
+                  />
+                ))}
               </svg>
 
               {/* 人物ノード */}
@@ -1170,6 +1079,32 @@ export default function FamilyTreeApp() {
                         </Label>
                         <Input id="death" value={selectedPerson.death?.date || ""} className="mt-1" />
                       </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="generation" className="text-sm font-medium text-gray-700">
+                        世代
+                      </Label>
+                      <Input 
+                        id="generation" 
+                        type="number"
+                        min="1"
+                        max="10"
+                        value={selectedPerson.generation || 1} 
+                        onChange={(e) => {
+                          const newGeneration = parseInt(e.target.value)
+                          if (newGeneration >= 1 && newGeneration <= 10) {
+                            const updatedFamilyMembers = familyData.family_members.map((person: any) => 
+                              person.id === selectedPerson.id 
+                                ? { ...person, generation: newGeneration }
+                                : person
+                            )
+                            setFamilyData({ ...familyData, family_members: updatedFamilyMembers })
+                            setSelectedPerson({ ...selectedPerson, generation: newGeneration })
+                          }
+                        }}
+                        className="mt-1" 
+                      />
                     </div>
 
                     <div>
