@@ -14,10 +14,15 @@ import {
   CheckCircle,
   Clock,
   Edit3,
+  Plus,
+  Trash2,
 } from "lucide-react"
 
 // 新しいコンポーネントとフックをインポート
 import { FamilyTree } from "./components/FamilyTree"
+import { PersonEditDialog } from "./components/PersonEditDialog"
+import { RelationshipEditDialog } from "./components/RelationshipEditDialog"
+import { AddPersonDialog } from "./components/AddPersonDialog"
 import { useFamilyData } from "./hooks/useFamilyData"
 import { ProcessedPerson, searchPersons } from "./utils/familyDataProcessor"
 import { UI_CONFIG } from "./constants/config"
@@ -42,8 +47,12 @@ export default function FamilyTreeApp() {
     families,
     isLoading,
     error,
+    addPerson,
     updatePerson,
     deletePerson,
+    addFamily,
+    updateFamily,
+    deleteFamily,
     refreshData
   } = useFamilyData()
 
@@ -52,6 +61,11 @@ export default function FamilyTreeApp() {
   const [searchQuery, setSearchQuery] = useState("")
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(UI_CONFIG.leftSidebarWidth)
   const [rightSidebarWidth, setRightSidebarWidth] = useState(UI_CONFIG.rightSidebarWidth)
+  
+  // 編集ダイアログの状態
+  const [isPersonEditOpen, setIsPersonEditOpen] = useState(false)
+  const [isRelationshipEditOpen, setIsRelationshipEditOpen] = useState(false)
+  const [isAddPersonOpen, setIsAddPersonOpen] = useState(false)
 
   // 人物選択ハンドラー
   const handlePersonSelect = (person: ProcessedPerson) => {
@@ -252,12 +266,53 @@ export default function FamilyTreeApp() {
             )}
           </div>
 
+          {/* 人物追加ボタン */}
+          <div className="px-6 py-4 border-b border-gray-200">
+            <Button 
+              onClick={() => setIsAddPersonOpen(true)}
+              className="w-full"
+              variant="outline"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              新しい人物を追加
+            </Button>
+          </div>
+
           {/* 選択中ノードの情報表示 */}
           <div className="flex-1 p-6 overflow-hidden">
             {selectedPerson ? (
               <div className="h-full flex flex-col">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-gray-900">人物情報</h3>
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => setIsPersonEditOpen(true)}
+                    >
+                      <Edit3 className="w-4 h-4 mr-1" />
+                      編集
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => setIsRelationshipEditOpen(true)}
+                    >
+                      関係編集
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="destructive"
+                      onClick={() => {
+                        if (confirm(`${selectedPerson.displayName}を削除してもよろしいですか？`)) {
+                          deletePerson(selectedPerson.id)
+                          setSelectedPerson(null)
+                        }
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
 
                 <ScrollArea className="flex-1">
@@ -337,6 +392,40 @@ export default function FamilyTreeApp() {
           </div>
         </aside>
       </div>
+
+      {/* 編集ダイアログ */}
+      <PersonEditDialog
+        person={selectedPerson}
+        isOpen={isPersonEditOpen}
+        onClose={() => setIsPersonEditOpen(false)}
+        onSave={(personId, updates) => {
+          updatePerson(personId, updates)
+          // 選択されている人物の情報も更新
+          if (selectedPerson && selectedPerson.id === personId) {
+            setSelectedPerson({ ...selectedPerson, ...updates })
+          }
+        }}
+        availablePersons={persons}
+      />
+
+      <RelationshipEditDialog
+        person={selectedPerson}
+        isOpen={isRelationshipEditOpen}
+        onClose={() => setIsRelationshipEditOpen(false)}
+        availablePersons={persons}
+        families={families}
+        onAddFamily={addFamily}
+        onUpdateFamily={updateFamily}
+        onDeleteFamily={deleteFamily}
+      />
+
+      <AddPersonDialog
+        isOpen={isAddPersonOpen}
+        onClose={() => setIsAddPersonOpen(false)}
+        onAdd={(personData) => {
+          addPerson(personData)
+        }}
+      />
     </div>
   )
 } 
